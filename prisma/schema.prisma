@@ -21,10 +21,12 @@ model User {
   password String
   role String @default("Owner")
   userStores UserStore[]
+  stores Store[] @relation("UserStore")
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
 
   @@map("users")
+  Store Store[]
 }
 
 model UserStore {
@@ -41,13 +43,18 @@ model Store {
   id String @id @default(uuid())
   name String
   adress String @unique
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id])
   userStores UserStore[]
   storeUsers StoreUser[]
+  categories Category[]
+  roles Role[] @relation("RoleStoreRelation")
+  products Product[]
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
-  roles Role[] @relation("RoleStoreRelation")
 
   @@map("stores")
+  User User[] @relation("UserStore")
 }
 
 model StoreUser {
@@ -64,8 +71,8 @@ model Role {
   id String @id @default(uuid())
   name String
   storeId String
-  permissions Permission[] @relation("RoleToPermission")
   store Store @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
+  permissions Permission[] @relation("RoleToPermission")
 
   @@unique([name, storeId])
 }
@@ -80,11 +87,11 @@ model Permission {
 model Category {
   id String @id @default(uuid())
   name String
-  Product Product[]
-  products Product[] @relation("Product.category")
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
+  products Product[]
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
-
 }
 
 model Product {
@@ -92,15 +99,15 @@ model Product {
   banner String
   name String
   price String
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
   categoryId String
   category Category @relation(fields: [categoryId], references: [id])
   ProductQuantity ProductQuantity[]
   quantities ProductQuantity[] @relation("ProductQuantity.product")
   StockMoviment StockMoviment[]
-  Category Category[] @relation("Product.category")
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
-
 }
 
 model ProductQuantity {
