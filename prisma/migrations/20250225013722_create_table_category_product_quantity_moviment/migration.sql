@@ -34,6 +34,7 @@ CREATE TABLE "Product" (
     "id" TEXT NOT NULL,
     "banner" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "price" TEXT NOT NULL,
     "categoryId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,

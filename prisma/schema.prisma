@@ -91,6 +91,7 @@ model Product {
   id String @id @default(uuid())
   banner String
   name String
+  price String
   categoryId String
   category Category @relation(fields: [categoryId], references: [id])
   ProductQuantity ProductQuantity[]
