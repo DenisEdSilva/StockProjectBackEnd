@@ -1,9 +1,18 @@
 import { Router, Request, Response, NextFunction } from "express";
 
+import { CreateUserController } from "./controllers/user/CreateUserController"
+import { AuthUserController } from "./controllers/user/AuthUserController"
+
 const router = Router();
 
-router.get("/teste", (req: Request, res: Response, next: NextFunction): void => {
-    res.json({ nome: "Denis"})
+router.post("/users", async (req: Request, res: Response): Promise<void> => {
+    const createUserController = new CreateUserController();
+    await createUserController.handle(req, res);
+});
+
+router.post("/session", async (req: Request, res: Response): Promise<void> => {
+    const authUserController = new AuthUserController();
+    await authUserController.handle(req, res);
 })
 
 export { router };
