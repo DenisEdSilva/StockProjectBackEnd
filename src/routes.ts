@@ -4,6 +4,11 @@ import { Router, Request, Response, NextFunction } from "express";
 import { CreateUserController } from "./controllers/user/CreateUserController"
 import { AuthUserController } from "./controllers/user/AuthUserController"
 import { DetailUserController } from "./controllers/user/DetailUserController"
+import { UpdateUserController } from "./controllers/user/UpdateUserController";
+
+// STORE CONTROLLERS
+import { CreateStoreController } from "./controllers/store/CreateStoreController";
+import { ListStoreController } from "./controllers/store/ListStoreController";
 
 // CATEGORY CONTROLLERS
 import { CreateCategoryController } from "./controllers/category/CreateCategoryController";
@@ -15,10 +20,11 @@ import { ListProductController } from "./controllers/products/ListProductControl
 
 // STOCK CONTROLLERS
 import { CreateStockController } from "./controllers/stock/CreateStockController";
+import { ListMovimentStockController } from "./controllers/stock/ListMovimentStockController";
 
 
 import { authenticated } from "./middlewares/authenticated"
-import { ListMovimentStockController } from "./controllers/stock/ListMovimentStockController";
+
 
 const router = Router();
 
@@ -36,6 +42,22 @@ router.post("/session", async (req: Request, res: Response): Promise<void> => {
 router.get("/me", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
     const detailUserController = new DetailUserController();
     await detailUserController.handle(req, res);
+})
+
+router.put("/me", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const updateUserController = new UpdateUserController();
+    await updateUserController.handle(req, res);
+});
+
+// STORE ROUTES
+router.post("/store", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const createStoreController = new CreateStoreController();
+    await createStoreController.handle(req, res);
+})
+
+router.get("/store", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const listStorecontroller = new ListStoreController();
+    await listStorecontroller.handle(req, res);
 })
 
 // CATEGORY ROUTES

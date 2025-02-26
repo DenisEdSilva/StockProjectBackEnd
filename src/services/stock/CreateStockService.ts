@@ -4,19 +4,22 @@ interface StockRequest {
     productId: string;
     type: string;
     quantity: number;
+    storeId: string
 }
 
 class CreateStockService {
-    async execute({ productId, type, quantity }: StockRequest) {
+    async execute({ productId, type, quantity, storeId }: StockRequest) {
         const stock = await prismaClient.productQuantity.create({
             data: {
                 productId: productId,
-                quantity: quantity
+                quantity: quantity,
+                storeId: storeId
             },
             select: {
                 id: true,
                 productId: true,
-                quantity: true
+                quantity: true,
+                storeId: true
             }
        })
 
@@ -24,12 +27,14 @@ class CreateStockService {
             data: {
                 productId: productId,
                 type: type,
-                quantity: quantity
+                quantity: quantity,
+                storeId: storeId
             },
             select: {
                 id: true,
                 productId: true,
-                quantity: true
+                quantity: true,
+                storeId: true
             }
        })
 

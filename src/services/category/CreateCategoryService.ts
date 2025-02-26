@@ -2,10 +2,11 @@ import prismaClient from "../../prisma";
 
 interface CategoryRequest {
     name: string;
+    storeId: string
 }
 
 class CreateCategoryService {
-    async execute({ name }: CategoryRequest) {
+    async execute({ name, storeId }: CategoryRequest) {
         
         if (name === "") {
             throw new Error("Invalid name");
@@ -13,7 +14,8 @@ class CreateCategoryService {
 
         const category = await prismaClient.category.create({
             data: {
-                name: name
+                name: name,
+                storeId: storeId
             },
             select: {
                 id: true,

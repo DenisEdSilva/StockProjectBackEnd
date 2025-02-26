@@ -5,7 +5,7 @@ class ListMovimentStockController {
     async handle(req: Request, res: Response) {
         const movimentStockService = new ListMovimentStockService()
 
-        const moviment = await movimentStockService.execute();
+        const moviment = await movimentStockService.execute( req.body );
 
         return res.json(moviment);
     }

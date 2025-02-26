@@ -48,13 +48,17 @@ model Store {
   userStores UserStore[]
   storeUsers StoreUser[]
   categories Category[]
-  roles Role[] @relation("RoleStoreRelation")
   products Product[]
+  ProductQuantity ProductQuantity[]
+  StockMoviment StockMoviment[]
+  roles Role[] @relation("RoleStoreRelation")
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
 
   @@map("stores")
   User User[] @relation("UserStore")
+  ProductQuantityStore ProductQuantityStore[]
+  StockMovimentStore StockMovimentStore[]
 }
 
 model StoreUser {
@@ -115,15 +119,39 @@ model ProductQuantity {
   product Product @relation(fields: [productId], references: [id])
   productId String
   quantity Int
+  storeId String
+  ProductQuantityStore ProductQuantityStore[]
+  store Store @relation(fields: [storeId], references: [id])
   Product Product[] @relation("ProductQuantity.product")
   updatedAt DateTime? @default(now())
+
+}
+
+model ProductQuantityStore {
+  id String @id @default(uuid())
+  productQuantityId String
+  productQuantity ProductQuantity @relation(fields: [productQuantityId], references: [id])
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
 }
 
 model StockMoviment {
   id String @id @default(uuid())
   product Product @relation(fields: [productId], references: [id])
   productId String
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
+  StockMovimentStore StockMovimentStore[]
   type String
   quantity Int
   updatedAt DateTime? @default(now())
+
+}
+
+model StockMovimentStore{
+  id String @id @default(uuid())
+  stockMovimentId String
+  stockMoviment StockMoviment @relation(fields: [stockMovimentId], references: [id])
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
 }
