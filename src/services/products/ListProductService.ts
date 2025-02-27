@@ -1,8 +1,8 @@
 import prismaClient from "../../prisma";
 
 interface ProductRequest {
-    storeId: string,
-    categoryId?: string
+    storeId: number,
+    categoryId?: number
 }
 
 class ListProductService {

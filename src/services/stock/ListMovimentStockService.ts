@@ -1,8 +1,8 @@
 import prismaClient from "../../prisma";
 
 interface MovimentRequest {
-    storeId: string;
-    productId?: string
+    storeId: number;
+    productId?: number
 }
 
 class ListMovimentStockService {
@@ -16,7 +16,7 @@ class ListMovimentStockService {
                 id: true,
                 productId: true,
                 type: true,
-                quantity: true,
+                stock: true,
                 storeId: true
             }
         });

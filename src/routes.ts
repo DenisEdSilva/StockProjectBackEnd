@@ -49,6 +49,11 @@ router.put("/me", (req, res, next) => {authenticated(req, res, next)}, async (re
     await updateUserController.handle(req, res);
 });
 
+// router.delete("/me", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+//     const deleteUserController = new DeleteUserController();
+//     await deleteUserController.handle(req, res);
+// });
+
 // STORE ROUTES
 router.post("/store", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
     const createStoreController = new CreateStoreController();

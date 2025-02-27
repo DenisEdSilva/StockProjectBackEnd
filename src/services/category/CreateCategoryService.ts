@@ -2,7 +2,7 @@ import prismaClient from "../../prisma";
 
 interface CategoryRequest {
     name: string;
-    storeId: string
+    storeId: number
 }
 
 class CreateCategoryService {

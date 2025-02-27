@@ -1,44 +1,63 @@
 import prismaClient from "../../prisma";
 
 interface StockRequest {
-    productId: string;
+    productId: number;
     type: string;
-    quantity: number;
-    storeId: string
+    stock: number;
+    storeId: number
 }
 
 class CreateStockService {
-    async execute({ productId, type, quantity, storeId }: StockRequest) {
-        const stock = await prismaClient.productQuantity.create({
-            data: {
-                productId: productId,
-                quantity: quantity,
-                storeId: storeId
-            },
-            select: {
-                id: true,
-                productId: true,
-                quantity: true,
-                storeId: true
-            }
-       })
+    async execute({ productId, type, stock, storeId }: StockRequest) {
+        if (type !== 'entrada' && type !== 'saida') {
+            throw new Error('Tipo de movimentacao invalido');
+        }
 
        const stockMoviment = await prismaClient.stockMoviment.create({
             data: {
                 productId: productId,
                 type: type,
-                quantity: quantity,
+                stock: stock,
                 storeId: storeId
             },
             select: {
                 id: true,
                 productId: true,
-                quantity: true,
+                stock: true,
                 storeId: true
             }
        })
 
-        return { stock, stockMoviment };
+       const stockMovimentStore = await prismaClient.stockMovimentStore.create({
+            data: {
+                stockMovimentId: stockMoviment.id,
+                storeId: storeId
+            },
+            select: {
+                id: true,
+                stockMovimentId: true,
+                storeId: true
+            }
+       })
+       
+       const stockUpdate = await prismaClient.product.update({
+            where: {
+                id: productId
+            },
+            data: {
+                stock: { increment: type === 'entrada' ? stock : -stock }
+            },
+            select: {
+                id: true,
+                name: true,
+                stock: true,
+                price: true,
+                banner: true,
+                storeId: true
+            }
+       })
+
+        return { stockMoviment, stockMovimentStore, stockUpdate };
     }
 }
 

@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "users" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
@@ -13,19 +13,19 @@ CREATE TABLE "users" (
 
 -- CreateTable
 CREATE TABLE "UserStore" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "storeId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "storeId" INTEGER NOT NULL,
 
     CONSTRAINT "UserStore_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "stores" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "adress" TEXT NOT NULL,
-    "ownerId" TEXT NOT NULL,
+    "ownerId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
 
@@ -34,28 +34,28 @@ CREATE TABLE "stores" (
 
 -- CreateTable
 CREATE TABLE "StoreUser" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" TEXT NOT NULL,
-    "storeId" TEXT NOT NULL,
+    "storeId" INTEGER NOT NULL,
 
     CONSTRAINT "StoreUser_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Role" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "storeId" TEXT NOT NULL,
+    "storeId" INTEGER NOT NULL,
 
     CONSTRAINT "Role_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Permission" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
 
@@ -64,9 +64,9 @@ CREATE TABLE "Permission" (
 
 -- CreateTable
 CREATE TABLE "Category" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "storeId" TEXT NOT NULL,
+    "storeId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
 
@@ -75,12 +75,14 @@ CREATE TABLE "Category" (
 
 -- CreateTable
 CREATE TABLE "Product" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "banner" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "stock" INTEGER NOT NULL DEFAULT 0,
     "price" TEXT NOT NULL,
-    "storeId" TEXT NOT NULL,
-    "categoryId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "storeId" INTEGER NOT NULL,
+    "categoryId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
 
@@ -88,48 +90,40 @@ CREATE TABLE "Product" (
 );
 
 -- CreateTable
-CREATE TABLE "ProductQuantity" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
-    "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "ProductQuantity_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "StockMoviment" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "productId" INTEGER NOT NULL,
+    "stock" INTEGER NOT NULL DEFAULT 0,
     "type" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
+    "storeId" INTEGER NOT NULL,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "StockMoviment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "StockMovimentStore" (
+    "id" SERIAL NOT NULL,
+    "stockMovimentId" INTEGER NOT NULL,
+    "storeId" INTEGER NOT NULL,
+
+    CONSTRAINT "StockMovimentStore_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_UserStore" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
 
     CONSTRAINT "_UserStore_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
 CREATE TABLE "_RoleToPermission" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
 
     CONSTRAINT "_RoleToPermission_AB_pkey" PRIMARY KEY ("A","B")
-);
-
--- CreateTable
-CREATE TABLE "_ProductQuantity.product" (
-    "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL,
-
-    CONSTRAINT "_ProductQuantity.product_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateIndex
@@ -152,9 +146,6 @@ CREATE INDEX "_UserStore_B_index" ON "_UserStore"("B");
 
 -- CreateIndex
 CREATE INDEX "_RoleToPermission_B_index" ON "_RoleToPermission"("B");
-
--- CreateIndex
-CREATE INDEX "_ProductQuantity.product_B_index" ON "_ProductQuantity.product"("B");
 
 -- AddForeignKey
 ALTER TABLE "UserStore" ADD CONSTRAINT "UserStore_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -181,10 +172,16 @@ ALTER TABLE "Product" ADD CONSTRAINT "Product_storeId_fkey" FOREIGN KEY ("storeI
 ALTER TABLE "Product" ADD CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ProductQuantity" ADD CONSTRAINT "ProductQuantity_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StockMoviment" ADD CONSTRAINT "StockMoviment_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StockMoviment" ADD CONSTRAINT "StockMoviment_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StockMoviment" ADD CONSTRAINT "StockMoviment_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockMovimentStore" ADD CONSTRAINT "StockMovimentStore_stockMovimentId_fkey" FOREIGN KEY ("stockMovimentId") REFERENCES "StockMoviment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockMovimentStore" ADD CONSTRAINT "StockMovimentStore_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_UserStore" ADD CONSTRAINT "_UserStore_A_fkey" FOREIGN KEY ("A") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -197,9 +194,3 @@ ALTER TABLE "_RoleToPermission" ADD CONSTRAINT "_RoleToPermission_A_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "_RoleToPermission" ADD CONSTRAINT "_RoleToPermission_B_fkey" FOREIGN KEY ("B") REFERENCES "Role"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ProductQuantity.product" ADD CONSTRAINT "_ProductQuantity.product_A_fkey" FOREIGN KEY ("A") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ProductQuantity.product" ADD CONSTRAINT "_ProductQuantity.product_B_fkey" FOREIGN KEY ("B") REFERENCES "ProductQuantity"("id") ON DELETE CASCADE ON UPDATE CASCADE;

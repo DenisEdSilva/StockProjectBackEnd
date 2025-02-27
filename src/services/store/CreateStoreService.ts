@@ -3,7 +3,7 @@ import prismaClient from "../../prisma";
 interface StoreRequest {
     name: string;
     adress:string;
-    ownerId: string;
+    ownerId: number;
 }
 
 class CreateStoreService {
@@ -12,7 +12,12 @@ class CreateStoreService {
             data: {
                 name: name,
                 adress: adress,
-                ownerId: ownerId
+                ownerId: ownerId,
+                userStores: {
+                    create: {
+                        userId: ownerId
+                    }
+                }
             },
             select: {
                 id: true,

@@ -1,7 +1,7 @@
 import prismaClient from "../../prisma";
 
 interface ListStoreRequest {
-    ownerId: string
+    ownerId: number
 }
 
 class ListStoreService {

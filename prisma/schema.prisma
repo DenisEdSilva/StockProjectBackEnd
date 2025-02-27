@@ -15,7 +15,7 @@ datasource db {
 
 //criar uma migration: npx prisma migrate dev
 model User {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
   email String @unique
   password String
@@ -30,9 +30,9 @@ model User {
 }
 
 model UserStore {
-  id String @id @default(uuid())
-  userId String
-  storeId String
+  id Int @id @default(autoincrement())
+  userId Int
+  storeId Int
   user User @relation(fields: [userId], references: [id])
   store Store @relation(fields: [storeId], references: [id])
 
@@ -40,41 +40,39 @@ model UserStore {
 }
 
 model Store {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
   adress String @unique
-  ownerId String
+  ownerId Int
   owner User @relation(fields: [ownerId], references: [id])
   userStores UserStore[]
   storeUsers StoreUser[]
   categories Category[]
   products Product[]
-  ProductQuantity ProductQuantity[]
   StockMoviment StockMoviment[]
   roles Role[] @relation("RoleStoreRelation")
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
+  User User[] @relation("UserStore")
+  StockMovimentStore StockMovimentStore[]
 
   @@map("stores")
-  User User[] @relation("UserStore")
-  ProductQuantityStore ProductQuantityStore[]
-  StockMovimentStore StockMovimentStore[]
 }
 
 model StoreUser {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
   email String @unique
   password String
   role String
+  storeId Int
   store Store @relation(fields: [storeId], references: [id])
-  storeId String
 }
 
 model Role {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
-  storeId String
+  storeId Int
   store Store @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
   permissions Permission[] @relation("RoleToPermission")
 
@@ -82,16 +80,16 @@ model Role {
 }
 
 model Permission {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
   description String
   roles Role[] @relation("RoleToPermission")
 }
 
 model Category {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   name String
-  storeId String
+  storeId Int
   store Store @relation(fields: [storeId], references: [id])
   products Product[]
   createdAt DateTime? @default(now())
@@ -99,59 +97,37 @@ model Category {
 }
 
 model Product {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   banner String
   name String
+  stock Int @default(0)
   price String
-  storeId String
+  description String
+  storeId Int
+  categoryId Int
   store Store @relation(fields: [storeId], references: [id])
-  categoryId String
   category Category @relation(fields: [categoryId], references: [id])
-  ProductQuantity ProductQuantity[]
-  quantities ProductQuantity[] @relation("ProductQuantity.product")
-  StockMoviment StockMoviment[]
+  stockMoviment StockMoviment[]
   createdAt DateTime? @default(now())
   updatedAt DateTime? @default(now())
 }
 
-model ProductQuantity {
-  id String @id @default(uuid())
-  product Product @relation(fields: [productId], references: [id])
-  productId String
-  quantity Int
-  storeId String
-  ProductQuantityStore ProductQuantityStore[]
-  store Store @relation(fields: [storeId], references: [id])
-  Product Product[] @relation("ProductQuantity.product")
-  updatedAt DateTime? @default(now())
-
-}
-
-model ProductQuantityStore {
-  id String @id @default(uuid())
-  productQuantityId String
-  productQuantity ProductQuantity @relation(fields: [productQuantityId], references: [id])
-  storeId String
-  store Store @relation(fields: [storeId], references: [id])
-}
-
 model StockMoviment {
-  id String @id @default(uuid())
-  product Product @relation(fields: [productId], references: [id])
-  productId String
-  storeId String
-  store Store @relation(fields: [storeId], references: [id])
-  StockMovimentStore StockMovimentStore[]
+  id Int @id @default(autoincrement())
+  productId Int
+  stock Int @default(0)
   type String
-  quantity Int
+  storeId Int
+  product Product @relation(fields: [productId], references: [id])
+  store Store @relation(fields: [storeId], references: [id])
+  stockMovimentStore StockMovimentStore[]
   updatedAt DateTime? @default(now())
-
 }
 
 model StockMovimentStore{
-  id String @id @default(uuid())
-  stockMovimentId String
+  id Int @id @default(autoincrement())
+  stockMovimentId Int
   stockMoviment StockMoviment @relation(fields: [stockMovimentId], references: [id])
-  storeId String
+  storeId Int
   store Store @relation(fields: [storeId], references: [id])
 }
