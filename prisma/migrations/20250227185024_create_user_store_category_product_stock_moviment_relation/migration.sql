@@ -79,7 +79,7 @@ CREATE TABLE "Product" (
     "banner" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "stock" INTEGER NOT NULL DEFAULT 0,
-    "price" TEXT NOT NULL,
+    "price" TEXT NOT NULL DEFAULT '0.00',
     "description" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
     "categoryId" INTEGER NOT NULL,
@@ -96,6 +96,7 @@ CREATE TABLE "StockMoviment" (
     "stock" INTEGER NOT NULL DEFAULT 0,
     "type" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "StockMoviment_pkey" PRIMARY KEY ("id")

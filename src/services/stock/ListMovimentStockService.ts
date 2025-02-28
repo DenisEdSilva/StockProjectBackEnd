@@ -17,7 +17,8 @@ class ListMovimentStockService {
                 productId: true,
                 type: true,
                 stock: true,
-                storeId: true
+                storeId: true,
+                isValid: true
             }
         });
 

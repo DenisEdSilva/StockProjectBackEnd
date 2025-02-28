@@ -13,6 +13,19 @@ class CreateStockService {
             throw new Error('Tipo de movimentacao invalido');
         }
 
+        const currentStock = await prismaClient.product.findUnique({
+            where: {
+                id: productId
+            },
+            select: {
+                stock: true
+            }
+        })
+
+        if (type === 'saida' && currentStock.stock < stock) {
+            throw new Error('Estoque insuficiente para concluir esta operação');
+        }
+
        const stockMoviment = await prismaClient.stockMoviment.create({
             data: {
                 productId: productId,
@@ -45,13 +58,16 @@ class CreateStockService {
                 id: productId
             },
             data: {
-                stock: { increment: type === 'entrada' ? stock : -stock }
+                stock: { 
+                    increment: type === 'entrada' ? stock : -stock, 
+                }
             },
             select: {
                 id: true,
                 name: true,
                 stock: true,
                 price: true,
+                description: true,
                 banner: true,
                 storeId: true
             }

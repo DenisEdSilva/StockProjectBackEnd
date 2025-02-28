@@ -21,8 +21,15 @@ import { ListProductController } from "./controllers/products/ListProductControl
 // STOCK CONTROLLERS
 import { CreateStockController } from "./controllers/stock/CreateStockController";
 import { ListMovimentStockController } from "./controllers/stock/ListMovimentStockController";
+import { RevertStockController } from "./controllers/stock/RevertStockController";
 
+// STORE USERS CONTROLLERS
+import { CreateStoreUserController } from "./controllers/storeUser/CreateStoreUserController";
+import { ListStoreUserController } from "./controllers/storeUser/ListStoreUserController";
+import { UpdateStoreUserController } from "./controllers/storeUser/UpdateStoreUserController";
+import { AuthStoreUserController } from "./controllers/storeUser/AuthStoreUserController";
 
+// MIDDLEWARES
 import { authenticated } from "./middlewares/authenticated"
 
 
@@ -48,11 +55,6 @@ router.put("/me", (req, res, next) => {authenticated(req, res, next)}, async (re
     const updateUserController = new UpdateUserController();
     await updateUserController.handle(req, res);
 });
-
-// router.delete("/me", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
-//     const deleteUserController = new DeleteUserController();
-//     await deleteUserController.handle(req, res);
-// });
 
 // STORE ROUTES
 router.post("/store", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
@@ -96,6 +98,32 @@ router.post("/stock", (req, res, next) => {authenticated(req, res, next)}, async
 router.get("/stockMoviment", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
     const listMovimentStockController = new ListMovimentStockController();
     await listMovimentStockController.handle(req, res);
+})
+
+router.post("/revertMoviment", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const revertStockController = new RevertStockController();
+    await revertStockController.handle(req, res);
+})
+
+// STORE USER ROUTES
+router.post("/store/user", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const createStoreUserController = new CreateStoreUserController();
+    await createStoreUserController.handle(req, res);
+})
+
+router.get("/store/user", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const listStoreUserController = new ListStoreUserController();
+    await listStoreUserController.handle(req, res);
+})
+
+router.put("/store/user", (req, res, next) => {authenticated(req, res, next)}, async (req: Request, res: Response): Promise<void> => {
+    const updateStoreUserController = new UpdateStoreUserController();
+    await updateStoreUserController.handle(req, res);
+})
+
+router.post("/store/session", async (req: Request, res: Response): Promise<void> => {
+    const authStoreUserController = new AuthStoreUserController();
+    await authStoreUserController.handle(req, res);
 })
 
 export { router };

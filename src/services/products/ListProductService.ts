@@ -17,7 +17,9 @@ class ListProductService {
                 id: true,
                 banner: true,
                 name: true,
+                stock: true,
                 price: true,
+                description: true,
                 categoryId: true,
                 storeId: true
             }
