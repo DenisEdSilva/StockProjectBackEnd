@@ -43,6 +43,7 @@ import { RevertStockController } from "./controllers/stock/RevertStockController
 // MIDDLEWARES
 import { authenticated } from "./middlewares/authenticated"
 import { authorized } from "./middlewares/authorized"
+import { UpdateRoleController } from "./controllers/role/UpdateRoleController";
 
 
 
@@ -65,52 +66,59 @@ router.post("/session", async (req: Request, res: Response): Promise<void> => {
     await authUserController.handle(req, res);
 })
 
-router.get("/me", authenticated, async (req: Request, res: Response): Promise<void> => {
-    const detailUserController = new DetailUserController();
-    await detailUserController.handle(req, res);
-})
-
 router.put("/me", authenticated, async (req: Request, res: Response): Promise<void> => {
     const updateUserController = new UpdateUserController();
     await updateUserController.handle(req, res);
 })
 
+router.get("/me", authenticated, async (req: Request, res: Response): Promise<void> => {
+    const detailUserController = new DetailUserController();
+    await detailUserController.handle(req, res);
+})
+
+// ...
+
 // STORE ROUTES
-router.post("/store", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/store", authenticated, authorized("POST", "STORE"), async (req: Request, res: Response): Promise<void> => {
     const createStoreController = new CreateStoreController();
     await createStoreController.handle(req, res);
 })
 
-router.get("/store", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.get("/store", authenticated, authorized("GET", "STORE"), async (req: Request, res: Response): Promise<void> => {
     const listStorecontroller = new ListStoreController();
     await listStorecontroller.handle(req, res);
 })
 
 // ROLE ROUTES
-router.post("/role", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/role", authenticated, authorized("POST", "ROLE"), async (req: Request, res: Response): Promise<void> => {
     const createRoleController = new CreateRoleController();
     await createRoleController.handle(req, res);
-  })
+})
+
+router.put("/role", authenticated, authorized("PUT", "ROLE"), async (req: Request, res: Response): Promise<void> => {
+    const updateRoleController = new UpdateRoleController();
+    await updateRoleController.handle(req, res);
+})
 
 // STORE USER ROUTES
-router.post("/store/user", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/store/user", authenticated, authorized("POST", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
     const createStoreUserController = new CreateStoreUserController();
     await createStoreUserController.handle(req, res);
-})
-
-router.get("/store/user", authenticated, async (req: Request, res: Response): Promise<void> => {
-    const listStoreUserController = new ListStoreUserController();
-    await listStoreUserController.handle(req, res);
-})
-
-router.put("/store/user", authenticated, async (req: Request, res: Response): Promise<void> => {
-    const updateStoreUserController = new UpdateStoreUserController();
-    await updateStoreUserController.handle(req, res);
 })
 
 router.post("/store/session", async (req: Request, res: Response): Promise<void> => {
     const authStoreUserController = new AuthStoreUserController();
     await authStoreUserController.handle(req, res);
+})
+
+router.put("/store/user", authenticated, authorized("PUT", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
+    const updateStoreUserController = new UpdateStoreUserController();
+    await updateStoreUserController.handle(req, res);
+})
+
+router.get("/store/user", authenticated, authorized("GET", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
+    const listStoreUserController = new ListStoreUserController();
+    await listStoreUserController.handle(req, res);
 })
 
 // CATEGORY ROUTES
@@ -125,30 +133,30 @@ router.get("/category", authenticated, authorized("GET", "CATEGORY"), async (req
 })
 
 // PRODUCT ROUTES
-router.post("/product", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/product", authenticated, authorized("POST", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
     const createProductController = new CreateProductController();
     await createProductController.handle(req, res);
 })
 
-router.get("/product", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.get("/product", authenticated, authorized("GET", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
     const listProductController = new ListProductController();
     await listProductController.handle(req, res);
 })
 
 // STOCK ROUTES
-router.post("/stock", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/stock", authenticated, authorized("POST", "STOCK"), async (req: Request, res: Response): Promise<void> => {
     const createStockController = new CreateStockController();
     await createStockController.handle(req, res);
 })
 
-router.get("/stockMoviment", authenticated, async (req: Request, res: Response): Promise<void> => {
-    const listMovimentStockController = new ListMovimentStockController();
-    await listMovimentStockController.handle(req, res);
-})
-
-router.post("/revertMoviment", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.post("/revertMoviment", authenticated, authorized("POST", "STOCK"), async (req: Request, res: Response): Promise<void> => {
     const revertStockController = new RevertStockController();
     await revertStockController.handle(req, res);
+})
+
+router.get("/stockMoviment", authenticated, authorized("GET", "STOCK"), async (req: Request, res: Response): Promise<void> => {
+    const listMovimentStockController = new ListMovimentStockController();
+    await listMovimentStockController.handle(req, res);
 })
 
 export { router };

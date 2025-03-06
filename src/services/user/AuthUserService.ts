@@ -36,6 +36,16 @@ class AuthUserService {
             expiresIn: "30d"
         })
 
+        const userData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isOwner: user.isOwner,
+            permissions: [],
+        };
+
+        await redisClient.set(`user:${user.id}`, JSON.stringify(userData));
+
         return {
             user: user.id,
             name: user.name,
