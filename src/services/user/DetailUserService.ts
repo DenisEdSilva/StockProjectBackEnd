@@ -6,21 +6,33 @@ interface UserRequest {
 
 class DetailUserService {
     async execute({ userId }: UserRequest) {
-        const user = await prismaClient.user.findFirst({
-            where: {
-                id: userId
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                isOwner: true
+        try {
+            if (!userId || isNaN(userId)) {
+                throw new Error("Invalid user ID");
             }
-        })
 
+            const user = await prismaClient.user.findUnique({
+                where: {
+                    id: userId,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    isOwner: true,
+                },
+            });
 
-        return user;
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            return user;
+        } catch (error) {
+            console.error("Error fetching user details:", error);
+            throw new Error(`Failed to fetch user details. Error: ${error.message}`);
+        }
     }
 }
 
-export { DetailUserService }
+export { DetailUserService };

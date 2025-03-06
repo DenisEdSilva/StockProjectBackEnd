@@ -6,20 +6,46 @@ interface UserRequest {
 
 class ListStoreUserService {
     async execute({ storeId }: UserRequest) {
-        const storeUserList = await prismaClient.storeUser.findMany({
-            where: {
-                storeId: storeId
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                roleId: true,
-                storeId: true
+        try {
+            if (!storeId || isNaN(storeId)) {
+                throw new Error("Invalid store ID");
             }
-        })
 
-        return storeUserList
+            const storeExists = await prismaClient.store.findUnique({
+                where: {
+                    id: storeId,
+                },
+            });
+
+            if (!storeExists) {
+                throw new Error("Store not found");
+            }
+
+            const storeUserList = await prismaClient.storeUser.findMany({
+                where: {
+                    storeId: storeId
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    roleId: true,
+                    storeId: true,
+                },
+                orderBy: {
+                    name: "asc"
+                }
+            })
+    
+            return {
+                count: storeUserList.length,
+                users: storeUserList
+            }
+
+        } catch (error) {
+            console.error("Error on listing store users:", error);
+            throw new Error(`Failed on listing store users. Error: ${error.message}`);
+        }
     }
 }
 
