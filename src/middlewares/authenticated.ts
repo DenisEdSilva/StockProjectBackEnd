@@ -10,6 +10,7 @@ export function authenticated(req: Request, res: Response, next: NextFunction): 
 
     if (!authHeader) {
         res.status(401).json({ message: "Token missing" });
+        return;
     }
 
     const [, token] = authHeader.split(" ");
