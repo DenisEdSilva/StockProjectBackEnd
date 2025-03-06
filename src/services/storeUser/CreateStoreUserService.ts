@@ -6,12 +6,12 @@ interface StoreUserRequest {
     name: string;
     email: string;
     password: string;
-    role: string;
+    roleId: number;
     storeId: number;
 }
 
 class CreateStoreUserService {
-    async execute({ userId, name, email, password, role, storeId }: StoreUserRequest) {
+    async execute({ userId, name, email, password, roleId, storeId }: StoreUserRequest) {
 
         const passwordHash = await hash(password, 8)
 
@@ -22,14 +22,14 @@ class CreateStoreUserService {
                 name: name,
                 email: email,
                 password: passwordHash,
-                role: role,
+                roleId: roleId,
                 storeId: storeId
             },
             select: {
                 id: true,
                 name: true,
                 email: true,
-                role: true,
+                roleId: true,
                 storeId: true
             }
         })

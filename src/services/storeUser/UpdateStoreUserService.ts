@@ -7,11 +7,11 @@ interface UserRequest {
     name?: string;
     email?: string;
     password?: string;
-    role?: string;
+    roleId?: number;
 }
 
 class UpdateStoreUserService {
-    async execute({ userId, storeId, name, email, password, role }: UserRequest) {
+    async execute({ userId, storeId, name, email, password, roleId }: UserRequest) {
 
         const passwordHash = await hash(password, 8)
 
@@ -26,7 +26,7 @@ class UpdateStoreUserService {
                     name: name,
                     email: email,
                     password: passwordHash,
-                    role: role,
+                    roleId: roleId,
                     storeId: storeId
 
                 },
@@ -34,7 +34,7 @@ class UpdateStoreUserService {
                     id: true,
                     name: true,
                     email: true,
-                    role: true,
+                    roleId: true,
                     storeId: true
 
                 }

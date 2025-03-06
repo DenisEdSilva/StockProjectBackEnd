@@ -30,7 +30,7 @@ class AuthStoreUserService {
         const token = sign({
             name: storeUser.name,
             email: storeUser.email,
-            role: storeUser.role,
+            roleId: storeUser.roleId,
         }, process.env.JWT_SECRET, {
             subject: storeUser.id.toString(),
             expiresIn: "30d"
@@ -40,7 +40,7 @@ class AuthStoreUserService {
             storeUserId: storeUser.id,
             name: storeUser.name,
             email: storeUser.email,
-            role: storeUser.role,
+            role: storeUser.roleId,
             token
         })
     }

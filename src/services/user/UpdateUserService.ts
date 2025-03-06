@@ -6,11 +6,10 @@ interface UserRequest {
     name?: string;
     email?: string;
     password?: string;
-    role?: string;
 }
 
 class UpdateUserService {
-    async execute({ userId, name, email, password, role }: UserRequest) {
+    async execute({ userId, name, email, password }: UserRequest) {
         const passwordHash = await hash(password, 8)
 
         const user = await prismaClient.user.update({
@@ -20,14 +19,12 @@ class UpdateUserService {
             data: {
                 ...(name && { name: name }),
                 ...(email && { email: email }),
-                ...(password && { password: passwordHash }),
-                ...(role && { role: role }),
+                ...(password && { password: passwordHash })
             },
             select: {
                 id: true,
                 name: true,
-                email: true,
-                role: true
+                email: true
             }
         })
 

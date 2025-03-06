@@ -14,7 +14,7 @@ class ListStoreUserService {
                 id: true,
                 name: true,
                 email: true,
-                role: true,
+                roleId: true,
                 storeId: true
             }
         })

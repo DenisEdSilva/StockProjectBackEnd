@@ -1,30 +1,26 @@
 import { NextFunction, Request, Response } from "express";
 import { verify } from "jsonwebtoken";
 
-interface Payload{
+interface Payload {
     sub: string;
 }
 
-export function authenticated(req: Request, res: Response, next: NextFunction) {
+export function authenticated(req: Request, res: Response, next: NextFunction): void {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-        return res.status(401).json({
-            message: "Token missing"
-        });
+        res.status(401).json({ message: "Token missing" });
     }
 
     const [, token] = authHeader.split(" ");
 
     try {
         const { sub } = verify(token, process.env.JWT_SECRET) as Payload;
-
         req.userId = parseInt(sub);
+        req.token = token;
 
-        return next();
+        next();
     } catch (err) {
-        return res.status(401).json({
-            message: "Invalid token"
-        });
+        res.status(401).json({ message: "Invalid token" });
     }
 }

@@ -3,7 +3,7 @@ import { CreateStoreUserService } from "../../services/storeUser/CreateStoreUser
 
 class CreateStoreUserController {
     async handle(req: Request, res: Response) {
-        const { userId, name, email, password, role, storeId } = req.body
+        const { userId, name, email, password, roleId, storeId } = req.body
 
         const createStoreUserService = new CreateStoreUserService()
 
@@ -12,7 +12,7 @@ class CreateStoreUserController {
             name, 
             email, 
             password, 
-            role, 
+            roleId, 
             storeId 
         });
 

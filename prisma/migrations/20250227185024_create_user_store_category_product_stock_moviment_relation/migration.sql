@@ -38,7 +38,7 @@ CREATE TABLE "StoreUser" (
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "role" TEXT NOT NULL,
+    "roleId" INTEGER NOT NULL,
     "storeId" INTEGER NOT NULL,
 
     CONSTRAINT "StoreUser_pkey" PRIMARY KEY ("id")

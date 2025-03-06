@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { compare } from "bcryptjs"
 import { sign } from "jsonwebtoken";
+import { redisClient } from "../../redis.config";
 
 interface AuthRequest {
     email: string;
@@ -26,9 +27,10 @@ class AuthUserService {
         }
 
         const token = sign({
+            id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            isOwner: user.isOwner
         }, process.env.JWT_SECRET, {
             subject: user.id.toString(),
             expiresIn: "30d"
@@ -38,7 +40,7 @@ class AuthUserService {
             user: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            isOwner: user.isOwner,
             token
         }
     }
