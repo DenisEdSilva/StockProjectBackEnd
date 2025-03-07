@@ -4,10 +4,10 @@ import { UpdateProductService } from "../../services/products/UpdateProductServi
 class UpdateProductController {
     async handle(req: Request, res: Response) {
         try {
-            const { id, name, stock, price, description } = req.body;
+            const { id, name, price, description } = req.body;
 
             const updateProductService = new UpdateProductService();
-            const product = await updateProductService.execute({ id, name, stock, price, description });
+            const product = await updateProductService.execute({ id, name, price, description });
 
             return res.status(200).json(product);
         } catch (error) {
