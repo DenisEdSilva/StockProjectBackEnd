@@ -3,12 +3,16 @@ import { ListMovimentStockService } from "../../services/stock/ListMovimentStock
 
 class ListMovimentStockController {
     async handle(req: Request, res: Response) {
-        const movimentStockService = new ListMovimentStockService()
+        try {
+            const movimentStockService = new ListMovimentStockService();
 
-        const moviment = await movimentStockService.execute( req.body );
+            const moviment = await movimentStockService.execute(req.body);
 
-        return res.json(moviment);
+            return res.json(moviment);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
-export { ListMovimentStockController }
+export { ListMovimentStockController };

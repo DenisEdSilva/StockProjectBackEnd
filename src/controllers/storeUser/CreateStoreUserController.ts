@@ -3,20 +3,23 @@ import { CreateStoreUserService } from "../../services/storeUser/CreateStoreUser
 
 class CreateStoreUserController {
     async handle(req: Request, res: Response) {
-        const { userId, name, email, password, roleId, storeId } = req.body
+        try {
+            const { userId, name, email, password, roleId, storeId } = req.body;
 
-        const createStoreUserService = new CreateStoreUserService()
+            const createStoreUserService = new CreateStoreUserService();
+            const storeUser = await createStoreUserService.execute({
+                userId,
+                name,
+                email,
+                password,
+                roleId,
+                storeId
+            });
 
-        const storeUser = await createStoreUserService.execute({ 
-            userId, 
-            name, 
-            email, 
-            password, 
-            roleId, 
-            storeId 
-        });
-
-        return res.json(storeUser)
+            return res.status(201).json(storeUser);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 

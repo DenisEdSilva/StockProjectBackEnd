@@ -3,22 +3,26 @@ import { CreateProductService } from "../../services/products/CreateProductServi
 
 class CreateProductController {
     async handle(req: Request, res: Response) {
-        const { banner, name, stock, price, description, categoryId, storeId } = req.body;
-        
-        const createProductService = new CreateProductService();
+        try {
+            const { banner, name, stock, price, description, categoryId, storeId } = req.body;
 
-        const product = await createProductService.execute({ 
-            banner, 
-            name, 
-            stock,
-            price, 
-            description,
-            categoryId,
-            storeId
-        });
+            const createProductService = new CreateProductService();
 
-        return res.json(product);
+            const product = await createProductService.execute({
+                banner,
+                name,
+                stock,
+                price,
+                description,
+                categoryId,
+                storeId,
+            });
+
+            return res.json(product);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
-export { CreateProductController }
+export { CreateProductController };

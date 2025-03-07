@@ -3,12 +3,15 @@ import { UpdateStoreUserService } from "../../services/storeUser/UpdateStoreUser
 
 class UpdateStoreUserController {
     async handle(req: Request, res: Response) {
-        const updateStoreUserService = new UpdateStoreUserService();
+        try {
+            const updateStoreUserService = new UpdateStoreUserService();
+            const storeUser = await updateStoreUserService.execute(req.body);
 
-        const storeUser = await updateStoreUserService.execute(req.body);
-
-        return res.json(storeUser);
+            return res.status(200).json(storeUser);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
-export { UpdateStoreUserController }
+export { UpdateStoreUserController };

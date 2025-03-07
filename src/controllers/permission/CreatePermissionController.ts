@@ -3,11 +3,15 @@ import { CreatePermissionService } from "../../services/permission/CreatePermiss
 
 class CreatePermissionController {
     async handle(req: Request, res: Response) {
-        const createPermissionService = new CreatePermissionService()
+        try {
+            const createPermissionService = new CreatePermissionService();
 
-        const permission = await createPermissionService.execute(req.body)
+            const permission = await createPermissionService.execute(req.body);
 
-        return res.json(permission)
+            return res.json(permission);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 

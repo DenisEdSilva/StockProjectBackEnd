@@ -3,12 +3,16 @@ import { CreateStockService } from "../../services/stock/CreateStockService";
 
 class CreateStockController {
     async handle(req: Request, res: Response) {
-        const createStockService = new CreateStockService();
+        try {
+            const createStockService = new CreateStockService();
 
-        const stock = await createStockService.execute(req.body);
+            const stock = await createStockService.execute(req.body);
 
-        return res.json(stock);
+            return res.json(stock);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
-export { CreateStockController }
+export { CreateStockController };

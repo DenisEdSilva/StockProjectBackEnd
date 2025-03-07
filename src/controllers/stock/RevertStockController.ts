@@ -3,12 +3,16 @@ import { RevertStockService } from "../../services/stock/RevertStockService";
 
 class RevertStockController {
     async handle(req: Request, res: Response) {
-        const revertStockService = new RevertStockService();
+        try {
+            const revertStockService = new RevertStockService();
 
-        const moviment = await revertStockService.execute(req.body);
+            const moviment = await revertStockService.execute(req.body);
 
-        return res.json(moviment);
+            return res.json(moviment);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
-export { RevertStockController }
+export { RevertStockController };

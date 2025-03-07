@@ -3,11 +3,15 @@ import { ListProductService } from "../../services/products/ListProductService";
 
 class ListProductController {
     async handle(req: Request, res: Response) {
-        const listProductService = new ListProductService();
+        try {
+            const listProductService = new ListProductService();
 
-        const products = await listProductService.execute(req.body);
+            const products = await listProductService.execute(req.body);
 
-        return res.json(products);
+            return res.json(products);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 }
 
