@@ -86,8 +86,7 @@ class UpdateStoreUserService {
                     name: name || userExists.name,
                     email: email || userExists.email,
                     password: passwordHash,
-                    roleId: roleId || userExists.roleId,
-                    updatedAt: new Date(),
+                    roleId: roleId || userExists.roleId
                 },
                 select: {
                     id: true,

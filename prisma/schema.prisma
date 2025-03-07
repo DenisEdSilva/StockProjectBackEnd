@@ -23,7 +23,7 @@ model User {
   userStores UserStore[]
   stores Store[] @relation("UserStore")
   createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
   Store Store[]
@@ -52,7 +52,7 @@ model Store {
   StockMoviment StockMoviment[]
   roles Role[] @relation("RoleStoreRelation")
   createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now())
+  updatedAt DateTime @updatedAt
   User User[] @relation("UserStore")
   StockMovimentStore StockMovimentStore[]
 
@@ -68,7 +68,7 @@ model StoreUser {
   storeId Int
   createdBy Int
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   store Store @relation(fields: [storeId], references: [id])
 }
@@ -80,7 +80,7 @@ model Role {
   store Store @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
   rolePermissions RolePermissionAssociation[] @relation("RoleToPermission")
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([name, storeId])
   RolePermissionAssociation RolePermissionAssociation[]
@@ -104,20 +104,20 @@ model RolePermissionAssociation {
   permission Permission @relation(fields: [permissionId], references: [id])
   rolePermissions Permission[] @relation("PermissionToRole")
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([roleId, permissionId])
   Role Role[] @relation("RoleToPermission")
 }
 
 model Category {
-  id Int @id @default(autoincrement())
-  name String
-  storeId Int
-  products Product[]
-  store Store @relation(fields: [storeId], references: [id])
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now())
+  id        Int      @id @default(autoincrement())
+  name      String
+  storeId   Int
+  products  Product[]
+  store     Store    @relation(fields: [storeId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Product {
@@ -133,7 +133,7 @@ model Product {
   category Category @relation(fields: [categoryId], references: [id])
   stockMoviment StockMoviment[]
   createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model StockMoviment {
@@ -147,7 +147,7 @@ model StockMoviment {
   store Store @relation(fields: [storeId], references: [id])
   stockMovimentStore StockMovimentStore[]
   createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model StockMovimentStore{
