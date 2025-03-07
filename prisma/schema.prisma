@@ -67,6 +67,9 @@ model StoreUser {
   roleId Int
   storeId Int
   createdBy Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
   store Store @relation(fields: [storeId], references: [id])
 }
 
@@ -76,6 +79,8 @@ model Role {
   storeId Int
   store Store @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
   rolePermissions RolePermissionAssociation[] @relation("RoleToPermission")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 
   @@unique([name, storeId])
   RolePermissionAssociation RolePermissionAssociation[]
@@ -87,7 +92,6 @@ model Permission {
   action String
   resource String
   rolePermissions RolePermissionAssociation[] @relation("PermissionToRole")
-
 
   RolePermissionAssociation RolePermissionAssociation[]
 }

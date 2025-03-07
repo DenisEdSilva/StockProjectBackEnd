@@ -31,6 +31,7 @@ class ListStoreUserService {
                     email: true,
                     roleId: true,
                     storeId: true,
+                    createdAt: true
                 },
                 orderBy: {
                     name: "asc"

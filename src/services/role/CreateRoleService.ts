@@ -71,8 +71,9 @@ class CreateRoleService {
                     select: {
                         id: true,
                         name: true,
-                        storeId: true,
+                        storeId: true
                     },
+
                 });
 
                 await prisma.rolePermissionAssociation.createMany({
