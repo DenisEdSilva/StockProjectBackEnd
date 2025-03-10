@@ -5,10 +5,12 @@ interface UserRequest {
     name: string;
     email: string;
     password: string;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class CreateUserService {
-    async execute({ name, email, password }: UserRequest) {
+    async execute({ name, email, password, ipAddress, userAgent }: UserRequest) {
         try {
             if (!name || typeof name !== "string" || name.trim() === "") {
                 throw new Error("Invalid name");
@@ -46,6 +48,21 @@ class CreateUserService {
                     name: true,
                     email: true,
                     isOwner: true,
+                },
+            });
+
+            await prismaClient.auditLog.create({
+                data: {
+                    action: "CREATE_USER",
+                    details: JSON.stringify({
+                        userId: user.id,
+                        name: user.name,
+                        email: user.email,
+                    }),
+                    userId: user.id,
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                    isOwner: user.isOwner,
                 },
             });
 

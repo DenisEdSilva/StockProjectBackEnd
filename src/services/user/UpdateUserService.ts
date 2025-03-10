@@ -6,10 +6,12 @@ interface UserRequest {
     name?: string;
     email?: string;
     password?: string;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class UpdateUserService {
-    async execute({ userId, name, email, password }: UserRequest) {
+    async execute({ userId, name, email, password, ipAddress, userAgent }: UserRequest) {
         try {
             if (!userId || isNaN(userId)) {
                 throw new Error("Invalid user ID");
@@ -48,6 +50,21 @@ class UpdateUserService {
                     id: true,
                     name: true,
                     email: true,
+                },
+            });
+
+            await prismaClient.auditLog.create({
+                data: {
+                    action: "UPDATE_USER",
+                    details: JSON.stringify({
+                        userId: user.id,
+                        name: user.name,
+                        email: user.email,
+                    }),
+                    userId: user.id,
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                    isOwner: userExists.isOwner,
                 },
             });
 

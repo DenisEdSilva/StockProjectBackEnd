@@ -6,10 +6,12 @@ import { redisClient } from "../../redis.config";
 interface AuthRequest {
     email: string;
     password: string;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class AuthUserService {
-    async execute({ email, password }: AuthRequest) {
+    async execute({ email, password, ipAddress, userAgent }: AuthRequest) {
         try {
             if (!email || !this.isValidEmail(email)) {
                 throw new Error("Invalid email");
@@ -58,6 +60,21 @@ class AuthUserService {
             };
 
             await redisClient.set(`user:${user.id}`, JSON.stringify(userData));
+
+            await prismaClient.auditLog.create({
+                data: {
+                    action: "AUTH_USER",
+                    details: JSON.stringify({
+                        userId: user.id,
+                        email: user.email,
+                        isOwner: user.isOwner,
+                    }),
+                    userId: user.id,
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                    isOwner: user.isOwner,
+                },
+            });
 
             return {
                 user: user.id,

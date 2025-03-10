@@ -2,10 +2,12 @@ import prismaClient from "../../prisma";
 
 interface UserRequest {
     userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class DetailUserService {
-    async execute({ userId }: UserRequest) {
+    async execute({ userId, ipAddress, userAgent }: UserRequest) {
         try {
             if (!userId || isNaN(userId)) {
                 throw new Error("Invalid user ID");
@@ -26,6 +28,21 @@ class DetailUserService {
             if (!user) {
                 throw new Error("User not found");
             }
+
+            await prismaClient.auditLog.create({
+                data: {
+                    action: "DETAIL_USER",
+                    details: JSON.stringify({
+                        userId: user.id,
+                        name: user.name,
+                        email: user.email,
+                    }),
+                    userId: user.id,
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                    isOwner: user.isOwner,
+                },
+            });
 
             return user;
         } catch (error) {

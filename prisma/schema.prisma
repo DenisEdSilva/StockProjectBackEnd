@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,147 +7,193 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//criar uma migration: npx prisma migrate dev
 model User {
-  id Int @id @default(autoincrement())
-  name String
-  email String @unique
-  password String
-  isOwner Boolean @default(true)
+  id        Int         @id @default(autoincrement())
+  name      String
+  email     String      @unique
+  password  String
+  isOwner   Boolean     @default(true)
+  createdAt DateTime?   @default(now())
+  updatedAt DateTime    @updatedAt
+  deletedAt DateTime?   
+  isDeleted Boolean     @default(false)
+
   userStores UserStore[]
-  stores Store[] @relation("UserStore")
-  createdAt DateTime? @default(now())
-  updatedAt DateTime @updatedAt
+  stores     Store[]     @relation("UserStore")
+  Store      Store[]
+  AuditLog   AuditLog[]
 
   @@map("users")
-  Store Store[]
 }
 
 model UserStore {
-  id Int @id @default(autoincrement())
-  userId Int
+  id      Int   @id @default(autoincrement())
+  userId  Int
   storeId Int
-  user User @relation(fields: [userId], references: [id])
+
+  user  User  @relation(fields: [userId], references: [id])
   store Store @relation(fields: [storeId], references: [id])
 
   @@unique([userId, storeId])
 }
 
 model Store {
-  id Int @id @default(autoincrement())
-  name String
-  adress String @unique
-  ownerId Int
-  owner User @relation(fields: [ownerId], references: [id])
-  userStores UserStore[]
-  storeUsers StoreUser[]
-  categories Category[]
-  products Product[]
-  StockMoviment StockMoviment[]
-  roles Role[] @relation("RoleStoreRelation")
+  id        Int      @id @default(autoincrement())
+  name      String
+  adress    String   @unique
+  ownerId   Int
   createdAt DateTime? @default(now())
   updatedAt DateTime @updatedAt
-  User User[] @relation("UserStore")
+  deletedAt DateTime?
+  isDeleted Boolean  @default(false)
+
+  owner           User              @relation(fields: [ownerId], references: [id])
+  userStores      UserStore[]
+  storeUsers      StoreUser[]
+  categories      Category[]
+  products        Product[]
+  StockMoviment   StockMoviment[]
+  roles           Role[]            @relation("RoleStoreRelation")
+  User            User[]            @relation("UserStore")
   StockMovimentStore StockMovimentStore[]
+  AuditLog        AuditLog[]
 
   @@map("stores")
 }
 
 model StoreUser {
-  id Int @id @default(autoincrement())
-  name String
-  email String @unique
-  password String
-  roleId Int
-  storeId Int
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  roleId    Int
+  storeId   Int
   createdBy Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  isDeleted Boolean  @default(false)
 
-  store Store @relation(fields: [storeId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
+  AuditLog AuditLog[]
 }
 
 model Role {
-  id Int @id @default(autoincrement())
-  name String
-  storeId Int
-  store Store @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
-  rolePermissions RolePermissionAssociation[] @relation("RoleToPermission")
+  id        Int      @id @default(autoincrement())
+  name      String
+  storeId   Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  isDeleted Boolean  @default(false)
+
+  store                Store                   @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
+  rolePermissions      RolePermissionAssociation[] @relation("RoleToPermission")
+  RolePermissionAssociation RolePermissionAssociation[]
 
   @@unique([name, storeId])
-  RolePermissionAssociation RolePermissionAssociation[]
 }
 
 model Permission {
-  id Int @id @default(autoincrement())
-  name String
-  action String
-  resource String
-  rolePermissions RolePermissionAssociation[] @relation("PermissionToRole")
+  id        Int      @id @default(autoincrement())
+  name      String
+  action    String
+  resource  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  rolePermissions RolePermissionAssociation[] @relation("PermissionToRole")
   RolePermissionAssociation RolePermissionAssociation[]
 }
 
 model RolePermissionAssociation {
-  id Int @id @default(autoincrement())
-  roleId Int
+  id          Int      @id @default(autoincrement())
+  roleId      Int
   permissionId Int
-  role Role @relation(fields: [roleId], references: [id])
-  permission Permission @relation(fields: [permissionId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  role        Role       @relation(fields: [roleId], references: [id])
+  permission  Permission @relation(fields: [permissionId], references: [id])
   rolePermissions Permission[] @relation("PermissionToRole")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  Role        Role[]     @relation("RoleToPermission")
 
   @@unique([roleId, permissionId])
-  Role Role[] @relation("RoleToPermission")
 }
 
 model Category {
   id        Int      @id @default(autoincrement())
   name      String
   storeId   Int
-  products  Product[]
-  store     Store    @relation(fields: [storeId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  isDeleted Boolean  @default(false)
+
+  store    Store    @relation(fields: [storeId], references: [id])
+  products Product[]
 }
 
 model Product {
-  id Int @id @default(autoincrement())
-  banner String
-  name String
-  stock Int @default(0)
-  price String @default("0.00")
+  id          Int      @id @default(autoincrement())
+  banner      String
+  name        String
+  stock       Int      @default(0)
+  price       String   @default("0.00")
   description String
-  storeId Int
-  categoryId Int
-  store Store @relation(fields: [storeId], references: [id])
-  category Category @relation(fields: [categoryId], references: [id])
+  storeId     Int
+  categoryId  Int
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  isDeleted   Boolean  @default(false)
+
+  store      Store    @relation(fields: [storeId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
   stockMoviment StockMoviment[]
-  createdAt DateTime? @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model StockMoviment {
-  id Int @id @default(autoincrement())
-  productId Int
-  stock Int @default(0)
-  type String
-  storeId Int
-  isValid Boolean @default(true)
-  product Product @relation(fields: [productId], references: [id])
-  store Store @relation(fields: [storeId], references: [id])
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  stock       Int      @default(0)
+  type        String
+  storeId     Int
+  isValid     Boolean  @default(true)
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  isDeleted   Boolean  @default(false)
+
+  product           Product           @relation(fields: [productId], references: [id])
+  store             Store             @relation(fields: [storeId], references: [id])
   stockMovimentStore StockMovimentStore[]
-  createdAt DateTime? @default(now())
-  updatedAt DateTime @updatedAt
 }
 
-model StockMovimentStore{
-  id Int @id @default(autoincrement())
+model StockMovimentStore {
+  id              Int      @id @default(autoincrement())
   stockMovimentId Int
+  storeId         Int
+  deletedAt       DateTime?
+  isDeleted       Boolean  @default(false)
+
   stockMoviment StockMoviment @relation(fields: [stockMovimentId], references: [id])
-  storeId Int
-  store Store @relation(fields: [storeId], references: [id])
+  store         Store         @relation(fields: [storeId], references: [id])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String
+  details     String?
+  userId      Int?
+  storeUserId Int?
+  storeId     Int?
+  ipAddress   String?
+  userAgent   String?
+  isOwner     Boolean?
+  createdAt   DateTime @default(now())
+
+  user      User?      @relation(fields: [userId], references: [id])
+  storeUser StoreUser? @relation(fields: [storeUserId], references: [id])
+  store     Store?     @relation(fields: [storeId], references: [id])
 }
