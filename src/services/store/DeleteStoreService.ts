@@ -94,32 +94,35 @@ class DeleteStoreService {
     }
 
     private async deleteRelatedRecords(storeId: number) {
-        await Promise.all([
-            prismaClient.role.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-            prismaClient.storeUser.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-            prismaClient.category.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-            prismaClient.product.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-            prismaClient.stockMoviment.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-            prismaClient.stockMovimentStore.updateMany({
-                where: { storeId },
-                data: { deletedAt: new Date(), isDeleted: true },
-            }),
-        ]);
+        await prismaClient.stockMovimentStore.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
+    
+        await prismaClient.stockMoviment.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
+
+        await prismaClient.product.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
+
+        await prismaClient.category.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
+
+        await prismaClient.storeUser.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
+
+        await prismaClient.role.updateMany({
+            where: { storeId },
+            data: { deletedAt: new Date(), isDeleted: true },
+        });
     }
 
     private async logDeleteAction({
