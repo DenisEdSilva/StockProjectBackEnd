@@ -1,11 +1,14 @@
 import prismaClient from "../../prisma";
 
 interface DeleteProductRequest {
-    id: number; // ID do produto a ser deletado
+    id: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class DeleteProductService {
-    async execute({ id }: DeleteProductRequest) {
+    async execute({ id, userId, ipAddress, userAgent }: DeleteProductRequest) {
         try {
             if (!id) {
                 throw new Error("Product ID is required");
@@ -13,11 +16,11 @@ class DeleteProductService {
 
             const productExists = await prismaClient.product.findUnique({
                 where: {
-                    id: id
+                    id: id,
                 },
                 include: {
-                    stockMoviment: true
-                }
+                    stockMoviment: true,
+                },
             });
 
             if (!productExists) {
@@ -26,27 +29,54 @@ class DeleteProductService {
 
             if (productExists.stockMoviment && productExists.stockMoviment.length > 0) {
                 for (const moviment of productExists.stockMoviment) {
-                    await prismaClient.stockMovimentStore.deleteMany({
+                    await prismaClient.stockMovimentStore.updateMany({
                         where: {
-                            stockMovimentId: moviment.id
-                        }
+                            stockMovimentId: moviment.id,
+                        },
+                        data: {
+                            isDeleted: true,
+                            deletedAt: new Date(),
+                        },
                     });
 
-                    await prismaClient.stockMoviment.delete({
+                    await prismaClient.stockMoviment.update({
                         where: {
-                            id: moviment.id
-                        }
+                            id: moviment.id,
+                        },
+                        data: {
+                            isDeleted: true,
+                            deletedAt: new Date(),
+                        },
                     });
                 }
             }
 
-            await prismaClient.product.delete({
+            const deletedProduct = await prismaClient.product.update({
                 where: {
-                    id: id
-                }
+                    id: id,
+                },
+                data: {
+                    isDeleted: true,
+                    deletedAt: new Date(),
+                },
             });
 
-            return { message: "Product and related stock movements deleted successfully" };
+            await prismaClient.auditLog.create({
+                data: {
+                    action: "DELETE_PRODUCT",
+                    details: JSON.stringify({
+                        productId: id,
+                        deletedAt: new Date(),
+                        relatedStockMoviments: productExists.stockMoviment.map((mov) => mov.id),
+                    }),
+                    userId: userId,
+                    storeId: productExists.storeId,
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                },
+            });
+
+            return { message: "Product and related stock movements marked as deleted successfully" };
         } catch (error) {
             console.error("Error on delete product: ", error);
             throw new Error(`Failed to delete product. Error: ${error.message}`);

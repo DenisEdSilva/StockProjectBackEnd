@@ -59,7 +59,10 @@ class DeleteStoreService {
                 relatedRecords,
             });
 
-            return deletedStore;
+            return {
+                message: "Store marked as deleted. You have 30 days to download the audit log backup.",
+                store: deletedStore,
+            };
         } catch (error) {
             console.error("Error deleting store:", error);
             throw new Error(`Failed to delete store. Error: ${error.message}`);
@@ -98,7 +101,7 @@ class DeleteStoreService {
             where: { storeId },
             data: { deletedAt: new Date(), isDeleted: true },
         });
-    
+
         await prismaClient.stockMoviment.updateMany({
             where: { storeId },
             data: { deletedAt: new Date(), isDeleted: true },
