@@ -42,15 +42,50 @@ async function cleanDeletedDatasAndLogs() {
             },
         });
 
-        await prismaClient.auditLog.deleteMany({
+        const deletedStores = await prismaClient.store.findMany({
             where: {
-                createdAt: {
+                isDeleted: true,
+                deletedAt: {
                     lt: thirtyMinutesAgo,
                 },
             },
         });
 
-        console.log("Non-critical deleted data and audit logs cleaned successfully");
+        for (const store of deletedStores) {
+            await prismaClient.stockMovimentStore.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.stockMoviment.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.product.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.category.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.storeUser.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.role.deleteMany({
+                where: { storeId: store.id },
+            });
+
+            await prismaClient.store.delete({
+                where: { id: store.id },
+            });
+
+            console.log(`Store ${store.name} and related data permanently deleted`);
+        }
+
+        await prismaClient.auditLog.deleteMany({});
+
+        console.log("Old deleted data and audit logs cleaned successfully");
     } catch (error) {
         console.error("Error cleaning deleted data and logs:", error);
     }
