@@ -15,9 +15,8 @@ model User {
   isOwner   Boolean     @default(true)
   createdAt DateTime?   @default(now())
   updatedAt DateTime    @updatedAt
-  deletedAt DateTime?   
-  isDeleted Boolean     @default(false)
-
+  markedForDeletionAt DateTime?
+  
   userStores UserStore[]
   stores     Store[]     @relation("UserStore")
   Store      Store[]
@@ -40,7 +39,9 @@ model UserStore {
 model Store {
   id        Int      @id @default(autoincrement())
   name      String
-  adress    String   @unique
+  city      String
+  state     String @db.Char(2)
+  zipCode String @db.Char(9)
   ownerId   Int
   createdAt DateTime? @default(now())
   updatedAt DateTime @updatedAt
