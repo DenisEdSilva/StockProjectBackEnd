@@ -1,49 +1,38 @@
 import prismaClient from "../../prisma";
 
 interface UpdateStoreRequest {
-    storeId: number;
+    id: number;
     name?: string;
-    adress?: string;
-    ownerId: number;
+    address?: string;
+    userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateStoreService {
-    async execute({ storeId, name, adress, ownerId, ipAddress, userAgent }: UpdateStoreRequest) {
+    async execute({ id, name, address, userId, ipAddress, userAgent }: UpdateStoreRequest) {
         try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
-
-            if (!ownerId || isNaN(ownerId)) {
-                throw new Error("Invalid owner ID");
+            if (!id) {
+                throw new Error("Store ID is required");
             }
 
             const storeExists = await prismaClient.store.findUnique({
                 where: {
-                    id: storeId,
-                    ownerId: ownerId,
+                    id: id,
                 },
             });
 
             if (!storeExists) {
-                throw new Error("Store not found or you do not have permission to update it");
+                throw new Error("Store not found");
             }
 
             const updatedStore = await prismaClient.store.update({
                 where: {
-                    id: storeId,
+                    id: id,
                 },
                 data: {
-                    ...(name && { name: name }),
-                    ...(adress && { adress: adress }),
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    adress: true,
-                    ownerId: true,
+                    name: name || storeExists.name,
+                    address: address || storeExists.address,
                 },
             });
 
@@ -51,19 +40,20 @@ class UpdateStoreService {
                 data: {
                     action: "UPDATE_STORE",
                     details: JSON.stringify({
-                        storeId: updatedStore.id,
-                        name: updatedStore.name,
-                        adress: updatedStore.adress,
+                        storeId: id,
+                        updatedFields: {
+                            name: name || "No changes",
+                            address: address || "No changes",
+                        },
                     }),
-                    userId: ownerId,
-                    storeId: storeId,
+                    userId: userId,
+                    storeId: id,
                     ipAddress: ipAddress,
                     userAgent: userAgent,
-                    isOwner: true,
                 },
             });
 
-            return updatedStore;
+            return { message: "Store updated successfully", store: updatedStore };
         } catch (error) {
             console.error("Error updating store:", error);
             throw new Error(`Failed to update store. Error: ${error.message}`);
