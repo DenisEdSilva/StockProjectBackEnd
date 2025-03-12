@@ -24,6 +24,11 @@ class DeleteUserService {
                 throw new Error("User not found");
             }
 
+            // preciso criar um metodo de enviar um email
+            // para o usuário e informar 
+            // o periodo que ele possui antes da remoção 
+            // pois ele precisa saber que precisa fazer o backup
+
             await prismaClient.user.update({
                 where: {
                     id: id,

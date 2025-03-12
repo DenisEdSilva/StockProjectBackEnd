@@ -8,14 +8,16 @@ datasource db {
 }
 
 model User {
-  id        Int         @id @default(autoincrement())
-  name      String
-  email     String      @unique
-  password  String
-  isOwner   Boolean     @default(true)
-  createdAt DateTime?   @default(now())
-  updatedAt DateTime    @updatedAt
-  markedForDeletionAt DateTime?
+  id                    Int         @id @default(autoincrement())
+  name                  String
+  email                 String      @unique
+  password              String
+  isOwner               Boolean     @default(true)
+  createdAt             DateTime?   @default(now())
+  updatedAt             DateTime    @updatedAt
+  lastActivityAt        DateTime?
+  deletionWarningSentAt DateTime? 
+  markedForDeletionAt   DateTime?
   
   userStores UserStore[]
   stores     Store[]     @relation("UserStore")
@@ -37,16 +39,17 @@ model UserStore {
 }
 
 model Store {
-  id        Int      @id @default(autoincrement())
-  name      String
-  city      String
-  state     String @db.Char(2)
-  zipCode String @db.Char(9)
-  ownerId   Int
-  createdAt DateTime? @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-  isDeleted Boolean  @default(false)
+  id             Int      @id @default(autoincrement())
+  name           String
+  city           String
+  state          String @db.Char(2)
+  zipCode        String @db.Char(9)
+  ownerId        Int
+  createdAt      DateTime? @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  isDeleted      Boolean  @default(false)
+  lastActivityAt DateTime?
 
   owner           User              @relation(fields: [ownerId], references: [id])
   userStores      UserStore[]
