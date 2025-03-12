@@ -5,10 +5,14 @@ class DeleteStoreUserController {
     async handle(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            const { userId, ipAddress, userAgent } = req.body;
 
             const deleteStoreUserService = new DeleteStoreUserService();
             const result = await deleteStoreUserService.execute({
-                id: parseInt(id, 10)
+                id: parseInt(id, 10),
+                userId: userId,
+                ipAddress: ipAddress,
+                userAgent: userAgent,
             });
 
             return res.status(200).json(result);

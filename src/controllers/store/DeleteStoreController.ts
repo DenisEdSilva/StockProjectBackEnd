@@ -11,7 +11,7 @@ class DeleteStoreController {
             const deletedStore = await softDeleteStoreService.execute({
                 storeId,
                 ownerId,
-                ipAddress: req.ip, // Passa o endereço IP
+                ipAddress: req.ip,
                 userAgent: req.headers["user-agent"],
             });
 

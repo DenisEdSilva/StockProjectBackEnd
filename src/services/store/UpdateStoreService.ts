@@ -3,14 +3,16 @@ import prismaClient from "../../prisma";
 interface UpdateStoreRequest {
     id: number;
     name?: string;
-    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
     userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateStoreService {
-    async execute({ id, name, address, userId, ipAddress, userAgent }: UpdateStoreRequest) {
+    async execute({ id, name, city, state, zipCode, userId, ipAddress, userAgent }: UpdateStoreRequest) {
         try {
             if (!id) {
                 throw new Error("Store ID is required");
@@ -32,7 +34,9 @@ class UpdateStoreService {
                 },
                 data: {
                     name: name || storeExists.name,
-                    address: address || storeExists.address,
+                    city: city || storeExists.city,
+                    state: state || storeExists.state,
+                    zipCode: zipCode || storeExists.zipCode,
                 },
             });
 
@@ -43,7 +47,9 @@ class UpdateStoreService {
                         storeId: id,
                         updatedFields: {
                             name: name || "No changes",
-                            address: address || "No changes",
+                            city: city || "No changes",
+                            state: state || "No changes",
+                            zipCode: zipCode || "No changes",
                         },
                     }),
                     userId: userId,

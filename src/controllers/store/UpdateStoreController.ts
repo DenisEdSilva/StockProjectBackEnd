@@ -5,13 +5,15 @@ class UpdateStoreController {
     async handle(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, address, userId, ipAddress, userAgent } = req.body;
+            const { name, city, state, zipCode, userId, ipAddress, userAgent } = req.body;
 
             const updateStoreService = new UpdateStoreService();
             const result = await updateStoreService.execute({
                 id: parseInt(id, 10),
                 name,
-                address,
+                city,
+                state,
+                zipCode,
                 userId,
                 ipAddress,
                 userAgent,

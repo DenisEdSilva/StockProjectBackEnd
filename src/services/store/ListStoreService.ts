@@ -28,7 +28,8 @@ class ListStoreService {
                 select: {
                     id: true,
                     name: true,
-                    adress: true,
+                    city: true,
+                    state: true,
                     ownerId: true,
                 },
             });

@@ -4,19 +4,18 @@ import { DeleteProductService } from "../../services/products/DeleteProductServi
 class DeleteProductController {
     async handle(req: Request, res: Response) {
         try {
-            const { id } = req.params; // Obtém o ID do produto a ser deletado
-
-            // Converte o ID para número (já que vem como string da requisição)
-            const productId = parseInt(id, 10);
-
-            if (isNaN(productId)) {
-                throw new Error("Invalid product ID");
-            }
+            const { id } = req.params;
+            const { userId, ipAddress, userAgent } = req.body;
 
             const deleteProductService = new DeleteProductService();
-            const result = await deleteProductService.execute({ id: productId });
+            const result = await deleteProductService.execute({
+                id: parseInt(id, 10),
+                userId,
+                ipAddress,
+                userAgent,
+            });
 
-            return res.status(200).json(result); // Retorna sucesso
+            return res.status(200).json(result);
         } catch (error) {
             return res.status(400).json({
                 error: error.message

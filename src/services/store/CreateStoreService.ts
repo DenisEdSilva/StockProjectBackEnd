@@ -2,19 +2,29 @@ import prismaClient from "../../prisma";
 
 interface StoreRequest {
     name: string;
-    adress: string;
+    city: string;
+    state: string;
+    zipCode: string;
     ownerId: number;
 }
 
 class CreateStoreService {
-    async execute({ name, adress, ownerId }: StoreRequest) {
+    async execute({ name, city, state, zipCode, ownerId }: StoreRequest) {
         try {
             if (!name || typeof name !== "string" || name.trim() === "") {
                 throw new Error("Invalid store name");
             }
 
-            if (!adress || typeof adress !== "string" || adress.trim() === "") {
-                throw new Error("Invalid store address");
+            if (!city || typeof city !== "string" || city.trim() === "") {
+                throw new Error("Invalid city");
+            }
+
+            if (!zipCode || typeof zipCode !== "string" || zipCode.trim() === "") {
+                throw new Error("Invalid zip code");
+            }
+
+            if (!state || typeof state !== "string" || state.trim() === "") {
+                throw new Error("Invalid state");
             }
 
             if (!ownerId || isNaN(ownerId)) {
@@ -34,7 +44,9 @@ class CreateStoreService {
             const store = await prismaClient.store.create({
                 data: {
                     name: name,
-                    adress: adress,
+                    city: city,
+                    state: state,
+                    zipCode: zipCode,
                     ownerId: ownerId,
                     userStores: {
                         create: {
@@ -45,7 +57,9 @@ class CreateStoreService {
                 select: {
                     id: true,
                     name: true,
-                    adress: true,
+                    city: true,
+                    state: true,
+                    zipCode: true,
                     ownerId: true,
                 },
             });

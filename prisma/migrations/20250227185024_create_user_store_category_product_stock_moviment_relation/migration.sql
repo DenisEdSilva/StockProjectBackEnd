@@ -24,7 +24,9 @@ CREATE TABLE "UserStore" (
 CREATE TABLE "stores" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "adress" TEXT NOT NULL,
+    "city" TEXT NOT NULL,
+    "state" CHAR(2) NOT NULL,
+    "zipCode" CHAR(9) NOT NULL,
     "ownerId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
@@ -132,9 +134,6 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "UserStore_userId_storeId_key" ON "UserStore"("userId", "storeId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "stores_adress_key" ON "stores"("adress");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StoreUser_email_key" ON "StoreUser"("email");

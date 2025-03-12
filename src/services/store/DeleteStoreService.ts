@@ -44,7 +44,8 @@ class DeleteStoreService {
                 select: {
                     id: true,
                     name: true,
-                    adress: true,
+                    city: true,
+                    state: true,
                     ownerId: true,
                     deletedAt: true,
                     isDeleted: true,
