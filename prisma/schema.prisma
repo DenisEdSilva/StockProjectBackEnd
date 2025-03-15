@@ -65,7 +65,7 @@ model StoreUser {
   isDeleted Boolean  @default(false)
 
   store    Store    @relation(fields: [storeId], references: [id])
-  role      Role     @relation(fields: [roleId], references: [id], name: "StoreUserRoleRelation")
+  role      Role     @relation(fields: [roleId], references: [id])
   AuditLog AuditLog[]
 }
 
@@ -81,7 +81,7 @@ model Role {
   store                Store                   @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
   rolePermissions      RolePermissionAssociation[] @relation("RoleToPermission")
   RolePermissionAssociation RolePermissionAssociation[]
-  StoreUser StoreUser[] @relation(name: "StoreUserRoleRelation")
+  StoreUser StoreUser[]
 
   @@unique([name, storeId])
 }

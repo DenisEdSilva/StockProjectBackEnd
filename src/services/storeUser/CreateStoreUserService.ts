@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { 
     ValidationError, 
@@ -34,7 +35,7 @@ class CreateStoreUserService {
                 data: {
                     ...data,
                     password: passwordHash
-                },
+                } as Prisma.StoreUserUncheckedCreateInput,
                 select: {
                     id: true,
                     name: true,
