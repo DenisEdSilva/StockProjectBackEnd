@@ -1,77 +1,56 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
-interface ProductRequest {
+interface UpdateProductRequest {
     id: number;
-    banner?: string;
     name?: string;
     price?: string;
     description?: string;
     categoryId?: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class UpdateProductService {
-    async execute({ id, banner, name, price, description, categoryId }: ProductRequest) {
-        try {
-            if (!id) {
-                throw new Error("Product ID is required");
+    private validateInput(data: UpdateProductRequest) {
+        if (data.price && isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
+        if (data.name?.length > 100) throw new ValidationError("Nome muito longo (máx. 100 caracteres)");
+    }
+
+    async execute(data: UpdateProductRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
+            if (!data.id || isNaN(data.id)) throw new ValidationError("ID do produto inválido");
+
+            const product = await tx.product.findUnique({ where: { id: data.id } });
+            if (!product) throw new NotFoundError("Produto não encontrado");
+            if (product.isDeleted) throw new ConflictError("Produto excluído");
+
+            if (data.categoryId) {
+                const category = await tx.category.findUnique({ where: { id: data.categoryId } });
+                if (!category) throw new NotFoundError("Categoria não existe");
             }
 
-            if (!banner && !name && !price && !description && !categoryId) {
-                throw new Error("At least one field must be updated");
-            }
-
-            const productExists = await prismaClient.product.findUnique({
-                where: {
-                    id: id
-                }
+            const updatedProduct = await tx.product.update({
+                where: { id: data.id },
+                data: { ...data },
+                select: { id: true, name: true, price: true, stock: true }
             });
 
-            if (!productExists) {
-                throw new Error("Product not found");
-            }
-
-            if (categoryId) {
-                const categoryExists = await prismaClient.category.findUnique({
-                    where: {
-                        id: categoryId
-                    }
-                });
-
-                if (!categoryExists) {
-                    throw new Error("Category not found");
-                }
-            }
-
-            const product = await prismaClient.product.update({
-                where: {
-                    id: id
-                },
+            await tx.auditLog.create({
                 data: {
-                    banner: banner,
-                    name: name,
-                    price: price,
-                    description: description,
-                    categoryId: categoryId
-                },
-                select: {
-                    id: true,
-                    banner: true,
-                    name: true,
-                    stock: true,
-                    price: true,
-                    description: true,
-                    categoryId: true,
-                    storeId: true,
-                    createdAt: true,
-                    updatedAt: true
+                    action: "PRODUCT_UPDATED",
+                    details: JSON.stringify(updatedProduct),
+                    userId: data.userId,
+                    storeId: product.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
                 }
             });
 
-            return product;
-        } catch (error) {
-            console.error("Error on update product: ", error);
-            throw new Error(`Failed to update product. Error: ${error.message}`);
-        }
+            return updatedProduct;
+        });
     }
 }
 

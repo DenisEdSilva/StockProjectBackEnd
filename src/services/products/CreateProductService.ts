@@ -1,82 +1,58 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
 interface ProductRequest {
     banner: string;
     name: string;
     stock: number;
     price: string;
-    description: string
+    description: string;
     categoryId: number;
-    storeId: number
+    storeId: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class CreateProductService {
-    async execute({ banner, name, stock, price, description, categoryId, storeId }: ProductRequest) {
-        try {
+    private validateInput(data: ProductRequest) {
+        if (!data.banner?.trim()) throw new ValidationError("Banner obrigatório");
+        if (!data.name?.trim()) throw new ValidationError("Nome obrigatório");
+        if (data.stock < 0) throw new ValidationError("Estoque inválido");
+        if (isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
+    }
 
-            if (!banner || !name || !stock || !price || !description || !categoryId || !storeId) {
-                throw new Error("All fields are required");
-            }
+    async execute(data: ProductRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
 
-            if (isNaN(stock) || stock <= 0) {
-                throw new Error("Invalid stock value");
-            }
+            const [category, store] = await Promise.all([
+                tx.category.findUnique({ where: { id: data.categoryId } }),
+                tx.store.findUnique({ where: { id: data.storeId } })
+            ]);
 
-            const priceNumber = parseFloat(price);
-            if (isNaN(priceNumber)) {
-                throw new Error("Invalid price format");
-            }
+            if (!category) throw new NotFoundError("Categoria não encontrada");
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
-            const categoryExists = await prismaClient.category.findUnique({
-                where: {
-                    id: categoryId
-                }
-            })
+            const product = await tx.product.create({
+                data: { ...data },
+                select: { id: true, name: true, price: true, stock: true }
+            });
 
-            if (!categoryExists) {
-                throw new Error("Category not found");
-            }
-
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId
-                }
-            })
-
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            const product = await prismaClient.product.create({
+            await tx.auditLog.create({
                 data: {
-                    banner: banner,
-                    name: name,
-                    stock,
-                    price: price,
-                    description: description,
-                    categoryId: categoryId,
-                    storeId: storeId
-                },
-                select: {
-                    id: true,
-                    banner: true,
-                    name: true,
-                    stock: true,
-                    price: true,
-                    description: true,
-                    categoryId: true,
-                    storeId: true,
-                    createdAt: true
+                    action: "PRODUCT_CREATED",
+                    details: JSON.stringify(product),
+                    userId: data.userId,
+                    storeId: data.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
                 }
-            })
-    
-            return product;
+            });
 
-        } catch (error) {
-            console.log("error creating product: ", error);
-            throw new Error(`Failed to create product. Error: ${error.message}`);
-        }
+            return product;
+        });
     }
 }
 
-export { CreateProductService }
+export { CreateProductService };

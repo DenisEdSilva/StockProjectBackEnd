@@ -1,32 +1,26 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { CreateProductService } from "../../services/products/CreateProductService";
-import { updateStoreActivity, updateUserActivity } from "../../utils/activityTracker";
 
 class CreateProductController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { banner, name, stock, price, description, categoryId, storeId } = req.body;
-            const userId = req.userId
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const { banner, name, stock, price, description, categoryId, storeId } = req.body;
+        const userId = req.userId;
 
-            const createProductService = new CreateProductService();
+        const service = new CreateProductService();
+        const product = await service.execute({
+            banner,
+            name,
+            stock,
+            price,
+            description,
+            categoryId,
+            storeId,
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            const product = await createProductService.execute({
-                banner,
-                name,
-                stock,
-                price,
-                description,
-                categoryId,
-                storeId,
-            });
-
-            await updateUserActivity(userId)
-            await updateStoreActivity(storeId)
-
-            return res.json(product);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(201).json(product);
     }
 }
 

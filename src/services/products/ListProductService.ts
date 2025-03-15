@@ -1,63 +1,43 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
-interface ProductRequest {
-    storeId: number,
-    categoryId?: number
+interface ListProductRequest {
+    storeId: number;
+    categoryId?: number;
 }
 
 class ListProductService {
-    async execute({ storeId, categoryId }: ProductRequest) {
-        try {
-            if (!storeId) {
-                throw new Error("Store ID is required");
-            }
-    
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId
-                }
-            })
+    async execute({ storeId, categoryId }: ListProductRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }  
+            const store = await tx.store.findUnique({ where: { id: storeId } });
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
             if (categoryId) {
-                const categoryExists = await prismaClient.category.findUnique({
-                    where: {
-                        id: categoryId
-                    }
-                })
-    
-                if (!categoryExists) {
-                    throw new Error("Category not found");
-                }
+                const category = await tx.category.findUnique({ where: { id: categoryId } });
+                if (!category) throw new NotFoundError("Categoria não existe");
             }
-    
-            const products = await prismaClient.product.findMany({
-                where: {
-                    storeId: storeId,
-                    ...(categoryId && { categoryId })
+
+            return await tx.product.findMany({
+                where: { 
+                    storeId,
+                    categoryId,
+                    isDeleted: false
                 },
                 select: {
                     id: true,
-                    banner: true,
                     name: true,
-                    stock: true,
                     price: true,
-                    description: true,
+                    stock: true,
+                    banner: true,
                     categoryId: true,
-                    storeId: true,
-                    createdAt: true
+                    createdAt: true,
+                    category: { select: { name: true } }
                 }
             });
-    
-            return products;
-        } catch (error) {
-            console.log("Error on list products: ", error);
-            throw new Error(`Failed to list products. Error: ${error.message}`);
-        }
+        });
     }
 }
 
-export { ListProductService }
+export { ListProductService };

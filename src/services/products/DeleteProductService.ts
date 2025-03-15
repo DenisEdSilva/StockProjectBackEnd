@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
 interface DeleteProductRequest {
     id: number;
@@ -9,78 +10,43 @@ interface DeleteProductRequest {
 
 class DeleteProductService {
     async execute({ id, userId, ipAddress, userAgent }: DeleteProductRequest) {
-        try {
-            if (!id) {
-                throw new Error("Product ID is required");
-            }
+        return await prismaClient.$transaction(async (tx) => {
+            if (!id || isNaN(id)) throw new ValidationError("ID do produto inválido");
 
-            const productExists = await prismaClient.product.findUnique({
-                where: {
-                    id: id,
-                },
-                include: {
-                    stockMoviment: true,
-                },
+            const product = await tx.product.findUnique({
+                where: { id },
+                include: { stockMoviment: true }
             });
 
-            if (!productExists) {
-                throw new Error("Product not found");
-            }
+            if (!product) throw new NotFoundError("Produto não encontrado");
+            if (product.isDeleted) throw new ConflictError("Produto já excluído");
 
-            if (productExists.stockMoviment && productExists.stockMoviment.length > 0) {
-                for (const moviment of productExists.stockMoviment) {
-                    await prismaClient.stockMovimentStore.updateMany({
-                        where: {
-                            stockMovimentId: moviment.id,
-                        },
-                        data: {
-                            isDeleted: true,
-                            deletedAt: new Date(),
-                        },
-                    });
+            await tx.stockMoviment.updateMany({
+                where: { id: { in: product.stockMoviment.map(m => m.id) } },
+                data: { isDeleted: true, deletedAt: new Date() }
+            });
 
-                    await prismaClient.stockMoviment.update({
-                        where: {
-                            id: moviment.id,
-                        },
-                        data: {
-                            isDeleted: true,
-                            deletedAt: new Date(),
-                        },
-                    });
+            const deletedProduct = await tx.product.update({
+                where: { id },
+                data: { isDeleted: true, deletedAt: new Date() }
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    action: "PRODUCT_DELETED",
+                    details: JSON.stringify({ productId: id }),
+                    userId,
+                    storeId: product.storeId,
+                    ipAddress,
+                    userAgent
                 }
-            }
-
-            const deletedProduct = await prismaClient.product.update({
-                where: {
-                    id: id,
-                },
-                data: {
-                    isDeleted: true,
-                    deletedAt: new Date(),
-                },
             });
 
-            await prismaClient.auditLog.create({
-                data: {
-                    action: "DELETE_PRODUCT",
-                    details: JSON.stringify({
-                        productId: id,
-                        deletedAt: new Date(),
-                        relatedStockMoviments: productExists.stockMoviment.map((mov) => mov.id),
-                    }),
-                    userId: userId,
-                    storeId: productExists.storeId,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                },
-            });
-
-            return { message: "Product and related stock movements marked as deleted successfully" };
-        } catch (error) {
-            console.error("Error on delete product: ", error);
-            throw new Error(`Failed to delete product. Error: ${error.message}`);
-        }
+            return { 
+                message: "Produto excluído",
+                deletedAt: deletedProduct.deletedAt
+            };
+        });
     }
 }
 

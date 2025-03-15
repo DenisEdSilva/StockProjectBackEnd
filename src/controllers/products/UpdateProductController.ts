@@ -1,18 +1,25 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { UpdateProductService } from "../../services/products/UpdateProductService";
 
 class UpdateProductController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { id, name, price, description } = req.body;
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const id = parseInt(req.params.id, 10);
+        const { name, price, description, categoryId } = req.body;
+        const userId = req.userId;
 
-            const updateProductService = new UpdateProductService();
-            const product = await updateProductService.execute({ id, name, price, description });
+        const service = new UpdateProductService();
+        const product = await service.execute({
+            id,
+            name,
+            price,
+            description,
+            categoryId,
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            return res.status(200).json(product);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(product);
     }
 }
 
