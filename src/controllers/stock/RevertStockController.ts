@@ -1,17 +1,20 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { RevertStockService } from "../../services/stock/RevertStockService";
 
 class RevertStockController {
-    async handle(req: Request, res: Response) {
-        try {
-            const revertStockService = new RevertStockService();
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const wrongMovimentId = parseInt(req.params.movimentId, 10);
+        const userId = req.userId;
 
-            const moviment = await revertStockService.execute(req.body);
+        const service = new RevertStockService();
+        const result = await service.execute({
+            wrongMovimentId,
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            return res.json(moviment);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(result);
     }
 }
 

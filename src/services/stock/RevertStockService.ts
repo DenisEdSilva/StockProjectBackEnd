@@ -1,83 +1,73 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
 interface StockRequest {
-  wrongMovimentId: number
+    wrongMovimentId: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class RevertStockService {
-  async execute({ wrongMovimentId }: StockRequest) {
-    try {
-      const wrongMoviment = await prismaClient.stockMoviment.findUnique({
-        where: {
-          id: wrongMovimentId
-        }
-      })
-
-      if (!wrongMoviment) {
-        throw new Error("Moviment not found");
-      }
-
-      const product = await prismaClient.product.findUnique({
-        where: {
-          id: wrongMoviment.productId
-        }
-      })
-
-      if (!product) {
-        throw new Error("Product not found");
-      }
-
-      const store = await prismaClient.store.findUnique({
-        where: {
-          id: wrongMoviment.storeId
-        }
-      })
-
-      if (!store) {
-        throw new Error("Store not found");
-      }
-
-      const result = await prismaClient.$transaction(async (prisma) => {
-        const newMoviment = await prisma.stockMoviment.create({
-          data: {
-            productId: wrongMoviment.productId,
-            type: wrongMoviment.type === 'entrada' ? 'saida' : 'entrada',
-            stock: wrongMoviment.stock,
-            storeId: wrongMoviment.storeId
-          }
-        })
-    
-        const updatedProduct = await prisma.product.update({
-          where: {
-            id: wrongMoviment.productId
-          },
-          data: {
-            stock: {
-              increment: newMoviment.type === 'entrada' ? newMoviment.stock : -newMoviment.stock
+    async execute(data: StockRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!data.wrongMovimentId || isNaN(data.wrongMovimentId)) {
+                throw new ValidationError("ID da movimentação inválido");
             }
-          }
-        })
-    
-        await prisma.stockMoviment.update({
-          where: {
-            id: wrongMovimentId
-          },
-          data: {
-            isValid: false
-          }
-        })
 
-        return { newMoviment, updatedProduct };
+            const wrongMoviment = await tx.stockMoviment.findUnique({
+                where: { id: data.wrongMovimentId },
+                include: { product: true }
+            });
 
+            if (!wrongMoviment) throw new NotFoundError("Movimentação não encontrada");
+            if (!wrongMoviment.isValid) throw new ConflictError("Movimentação já revertida");
+            if (!wrongMoviment.product) throw new NotFoundError("Produto relacionado não encontrado");
 
-      })
-      
-    } catch (error) {
-      console.log(error)
-      console.log("Error on revert stock moviment", error)
-      throw new Error(`Error on revert stock moviment. Error: ${error.message}`);
+            const reverseType = wrongMoviment.type === 'entrada' ? 'saida' : 'entrada';
+            const reverseAmount = wrongMoviment.type === 'entrada' ? -wrongMoviment.stock : wrongMoviment.stock;
+
+            const newMoviment = await tx.stockMoviment.create({
+                data: {
+                    productId: wrongMoviment.productId,
+                    type: reverseType,
+                    stock: wrongMoviment.stock,
+                    storeId: wrongMoviment.storeId,
+                    isValid: true
+                }
+            });
+
+            await Promise.all([
+                tx.product.update({
+                    where: { id: wrongMoviment.productId },
+                    data: { stock: { increment: reverseAmount } }
+                }),
+                tx.stockMoviment.update({
+                    where: { id: data.wrongMovimentId },
+                    data: { isValid: false }
+                })
+            ]);
+
+            await tx.auditLog.create({
+                data: {
+                    action: "STOCK_REVERTED",
+                    details: JSON.stringify({
+                        originalMoviment: data.wrongMovimentId,
+                        newMoviment: newMoviment.id
+                    }),
+                    userId: data.userId,
+                    storeId: wrongMoviment.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
+            });
+
+            return { 
+                message: "Movimentação revertida com sucesso",
+                newStock: wrongMoviment.product.stock + reverseAmount
+            };
+        });
     }
-  } 
 }
 
-export { RevertStockService }
+export { RevertStockService };

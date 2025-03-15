@@ -1,17 +1,15 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { ListMovimentStockService } from "../../services/stock/ListMovimentStockService";
 
 class ListMovimentStockController {
-    async handle(req: Request, res: Response) {
-        try {
-            const movimentStockService = new ListMovimentStockService();
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const storeId = parseInt(req.params.storeId, 10);
+        const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
 
-            const moviment = await movimentStockService.execute(req.body);
+        const service = new ListMovimentStockService();
+        const result = await service.execute({ storeId, productId });
 
-            return res.json(moviment);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(result);
     }
 }
 

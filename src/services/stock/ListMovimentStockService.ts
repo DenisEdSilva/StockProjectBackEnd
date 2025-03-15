@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
 interface MovimentRequest {
     storeId: number;
@@ -7,57 +8,30 @@ interface MovimentRequest {
 
 class ListMovimentStockService {
     async execute({ storeId, productId }: MovimentRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+        return await prismaClient.$transaction(async (tx) => {
+            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
-            });
+            const store = await tx.store.findUnique({ where: { id: storeId } });
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
+            if (productId && isNaN(productId)) throw new ValidationError("ID do produto inválido");
             if (productId) {
-                const productExists = await prismaClient.product.findUnique({
-                    where: {
-                        id: productId,
-                    },
-                });
-
-                if (!productExists) {
-                    throw new Error("Product not found");
-                }
+                const product = await tx.product.findUnique({ where: { id: productId } });
+                if (!product) throw new NotFoundError("Produto não encontrado");
             }
 
-            const moviment = await prismaClient.stockMoviment.findMany({
-                where: {
-                    storeId: storeId,
-                    ...(productId && { productId }),
-                },
+            return await tx.stockMoviment.findMany({
+                where: { storeId, productId, isValid: true },
                 select: {
                     id: true,
-                    productId: true,
                     type: true,
                     stock: true,
-                    storeId: true,
-                    isValid: true,
                     createdAt: true,
+                    product: { select: { name: true, banner: true } }
                 },
-                orderBy: {
-                    createdAt: "desc",
-                },
+                orderBy: { createdAt: 'desc' }
             });
-
-            return moviment;
-        } catch (err) {
-            console.error("Error listing stock movements:", err);
-            throw new Error(`Failed to list stock movements. Error: ${err.message}`);
-        }
+        });
     }
 }
 
