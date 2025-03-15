@@ -1,109 +1,90 @@
 import prismaClient from "../../prisma";
 import { hash } from "bcryptjs";
+import { 
+    ValidationError, 
+    NotFoundError, 
+    ConflictError 
+} from "../../errors";
 
-interface UserRequest {
-    userId: number;
+interface UpdateRequest {
+    id: number;
     storeId: number;
     name?: string;
     email?: string;
     password?: string;
     roleId?: number;
+    updatedBy: number;
 }
 
 class UpdateStoreUserService {
-    async execute({ userId, storeId, name, email, password, roleId }: UserRequest) {
-        try {
-            if (!userId || isNaN(userId)) {
-                throw new Error("Invalid user ID");
-            }
+    private validateInput(data: UpdateRequest) {
+        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
+        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+        if (data.email && !this.isValidEmail(data.email)) throw new ValidationError("Formato de email inválido");
+        if (data.password && data.password.length < 8) throw new ValidationError("Senha deve ter 8+ caracteres");
+    }
 
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+    async execute(data: UpdateRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
 
-            const userExists = await prismaClient.storeUser.findUnique({
-                where: {
-                    id: userId,
-                    storeId: storeId,
-                },
+            const user = await tx.storeUser.findUnique({
+                where: { id: data.id, storeId: data.storeId }
             });
 
-            if (!userExists) {
-                throw new Error("User not found");
-            }
+            if (!user) throw new NotFoundError("Usuário não encontrado");
+            if (user.isDeleted) throw new NotFoundError("Usuário desativado");
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
-            });
-
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            if (roleId) {
-                const roleExists = await prismaClient.role.findUnique({
-                    where: {
-                        id: roleId,
-                    },
+            if (data.email && data.email !== user.email) {
+                const emailExists = await tx.storeUser.findUnique({
+                    where: { email: data.email }
                 });
-
-                if (!roleExists) {
-                    throw new Error("Role not found");
-                }
+                if (emailExists) throw new ConflictError("Email já cadastrado");
             }
 
-            if (email) {
-                const emailExists = await prismaClient.storeUser.findFirst({
-                    where: {
-                        email: email,
-                        NOT: {
-                            id: userId,
-                        },
-                    },
+            if (data.roleId) {
+                const roleExists = await tx.role.findUnique({
+                    where: { id: data.roleId }
                 });
-
-                if (emailExists) {
-                    throw new Error("Email already in use");
-                }
+                if (!roleExists) throw new NotFoundError("Perfil não encontrado");
             }
 
-            let passwordHash = userExists.password;
-            if (password) {
-                if (password.length < 6) {
-                    throw new Error("Password must be at least 6 characters long");
-                }
-                passwordHash = await hash(password, 8);
-            }
+            const passwordHash = data.password
+                ? await hash(data.password, 12)
+                : user.password;
 
-            const updatedUser = await prismaClient.storeUser.update({
-                where: {
-                    id: userId,
-                    storeId: storeId,
-                },
+            const updatedUser = await tx.storeUser.update({
+                where: { id: data.id },
                 data: {
-                    name: name || userExists.name,
-                    email: email || userExists.email,
+                    name: data.name || user.name,
+                    email: data.email || user.email,
                     password: passwordHash,
-                    roleId: roleId || userExists.roleId
+                    roleId: data.roleId || user.roleId
                 },
                 select: {
                     id: true,
                     name: true,
                     email: true,
                     roleId: true,
-                    storeId: true,
-                    createdAt: true,
                     updatedAt: true
-                },
+                }
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    action: "STORE_USER_UPDATED",
+                    details: `Usuário ${data.id} atualizado`,
+                    userId: data.updatedBy,
+                    storeId: data.storeId
+                }
             });
 
             return updatedUser;
-        } catch (error) {
-            console.error("Error updating store user:", error);
-            throw new Error(`Failed to update store user. Error: ${error.message}`);
-        }
+        });
+    }
+
+    private isValidEmail(email: string): boolean {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
 }
 

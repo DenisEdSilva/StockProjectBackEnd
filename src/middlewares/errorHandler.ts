@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction, ErrorRequestHandler } from "express";
-import { ConflictError, ValidationError } from "../errors";
+import { ConflictError, ValidationError, UnauthorizedError } from "../errors";
 
 export const errorHandler: ErrorRequestHandler = (
     error: Error,
@@ -14,6 +14,11 @@ export const errorHandler: ErrorRequestHandler = (
 
     if (error instanceof ConflictError) {
         res.status(409).json({ error: error.message });
+        return;
+    }
+
+    if (error instanceof UnauthorizedError) {
+        res.status(401).json({ error: error.message });
         return;
     }
 

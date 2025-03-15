@@ -1,58 +1,60 @@
 import prismaClient from "../../prisma";
+import { 
+    ValidationError, 
+    NotFoundError 
+} from "../../errors";
 
-interface DeleteStoreUserRequest {
+interface DeleteRequest {
     id: number;
-    userId: number;
+    storeId: number;
+    deletedBy: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class DeleteStoreUserService {
-    async execute({ id, userId, ipAddress, userAgent }: DeleteStoreUserRequest) {
-        try {
-            if (!id) {
-                throw new Error("StoreUser ID is required");
-            }
+    private validateInput(data: DeleteRequest) {
+        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
+        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+        if (!data.deletedBy || isNaN(data.deletedBy)) throw new ValidationError("ID do executor inválido");
+    }
 
-            const storeUserExists = await prismaClient.storeUser.findUnique({
-                where: {
-                    id: id,
-                },
+    async execute(data: DeleteRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
+
+            const user = await tx.storeUser.findUnique({
+                where: { id: data.id, storeId: data.storeId }
             });
 
-            if (!storeUserExists) {
-                throw new Error("StoreUser not found");
-            }
+            if (!user) throw new NotFoundError("Usuário não encontrado");
+            if (user.isDeleted) throw new NotFoundError("Usuário já desativado");
 
-            const deletedStoreUser = await prismaClient.storeUser.update({
-                where: {
-                    id: id,
-                },
+            await tx.storeUser.update({
+                where: { id: data.id },
                 data: {
                     isDeleted: true,
                     deletedAt: new Date(),
-                },
+                    deletedBy: data.deletedBy
+                }
             });
 
-            await prismaClient.auditLog.create({
+            await tx.auditLog.create({
                 data: {
-                    action: "DELETE_STORE_USER",
+                    action: "STORE_USER_DELETED",
                     details: JSON.stringify({
-                        storeUserId: id,
-                        deletedAt: new Date(),
+                        deletedBy: data.deletedBy,
+                        device: data.userAgent
                     }),
-                    userId: userId,
-                    storeId: storeUserExists.storeId,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                },
+                    userId: data.id,
+                    storeId: data.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
             });
 
-            return { message: "StoreUser marked as deleted successfully" };
-        } catch (error) {
-            console.error("Error on soft delete StoreUser: ", error);
-            throw new Error(`Failed to soft delete StoreUser. Error: ${error.message}`);
-        }
+            return { success: true };
+        });
     }
 }
 

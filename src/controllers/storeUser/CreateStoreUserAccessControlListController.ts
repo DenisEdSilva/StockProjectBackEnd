@@ -4,26 +4,23 @@ import { redisClient } from "../../redis.config";
 
 class CreateStoreUserAccessControlListController {
     async handle(req: Request, res: Response) {
-        try {
-            const userId = req.userId;
-            const token = req.token;
+        const storeUserId = parseInt(req.params.storeUserId, 10);
+        const token = req.token;
 
-            const createUserAccessControlListService = new CreateStoreUserAccessControlListService();
-            const user = await createUserAccessControlListService.execute({ storeUserId: userId });
+        const service = new CreateStoreUserAccessControlListService();
+        const acl = await service.execute({ storeUserId });
 
-            if (user instanceof Error) {
-                return res.status(400).json({ error: user.message });
-            }
+        await redisClient.setEx(
+            `acl:${storeUserId}`,
+            28800,
+            JSON.stringify({ ...acl, token })
+        );
 
-            await redisClient.set(`user:${userId}`, JSON.stringify({ ...user, token }));
-
-            const userWithToken = { ...user, token };
-            console.log(userWithToken);
-
-            return res.status(200).json(userWithToken);
-        } catch (error) {
-            return res.status(400).json({ error: error.message }); 
-        }
+        return res.status(200).json({
+            userId: acl.id,
+            permissions: acl.permissions,
+            token
+        });
     }
 }
 

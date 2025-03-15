@@ -3,16 +3,13 @@ import { ListStoreUserService } from "../../services/storeUser/ListStoreUserServ
 
 class ListStoreUserController {
     async handle(req: Request, res: Response) {
-        try {
-            const listStoreUserService = new ListStoreUserService();
-            const storeUserList = await listStoreUserService.execute({
-                storeId: req.body.storeId
-            });
+        const storeId = parseInt(req.params.storeId, 10);
+        const userId = req.userId;
 
-            return res.status(200).json(storeUserList);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        const service = new ListStoreUserService();
+        const result = await service.execute(userId);
+
+        return res.status(200).json(result);
     }
 }
 

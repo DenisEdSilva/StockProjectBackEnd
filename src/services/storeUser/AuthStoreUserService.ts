@@ -1,85 +1,103 @@
 import prismaClient from "../../prisma";
 import { compare } from "bcryptjs";
 import { sign } from "jsonwebtoken";
+import { 
+    ValidationError, 
+    NotFoundError, 
+    UnauthorizedError 
+} from "../../errors";
 
-interface UserRequest {
+interface AuthRequest {
     storeId: number;
     email: string;
     password: string;
+    ipAddress: string;
+    userAgent: string;
+}
+
+interface AuthResponse {
+    id: number;
+    name: string;
+    email: string;
+    roleId: number;
+    storeId: number;
+    token: string;
+    permissions: Array<{ action: string; resource: string }>;
 }
 
 class AuthStoreUserService {
-    async execute({ storeId, email, password }: UserRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+    async execute(data: AuthRequest): Promise<AuthResponse> {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
 
-            if (!email || !this.isValidEmail(email)) {
-                throw new Error("Invalid email");
-            }
-
-            if (!password || password.length < 6) {
-                throw new Error("Invalid password");
-            }
-
-            const storeExists = await prismaClient.store.findUnique({
+            const storeUser = await tx.storeUser.findFirst({
                 where: {
-                    id: storeId,
+                    storeId: data.storeId,
+                    email: data.email,
+                    isDeleted: false
                 },
+                include: {
+                    role: {
+                        include: {
+                            rolePermissions: {
+                                include: {
+                                    permission: true
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            const storeUser = await prismaClient.storeUser.findFirst({
-                where: {
-                    storeId: storeId,
-                    email: email,
-                },
-            });
-
-            if (!storeUser) {
-                throw new Error("User or password incorrect");
-            }
-
-            const passwordMatch = await compare(password, storeUser.password);
-
-            if (!passwordMatch) {
-                throw new Error("User or password incorrect");
-            }
+            if (!storeUser) throw new UnauthorizedError("Invalid credentials");
+            
+            const passwordValid = await compare(data.password, storeUser.password);
+            if (!passwordValid) throw new UnauthorizedError("Invalid credentials");
 
             const token = sign(
-                {
-                    name: storeUser.name,
-                    email: storeUser.email,
-                    roleId: storeUser.roleId,
-                },
-                process.env.JWT_SECRET,
-                {
-                    subject: storeUser.id.toString(),
-                    expiresIn: "30d",
-                }
+                { sub: storeUser.id, storeId: storeUser.storeId, role: storeUser.roleId },
+                process.env.JWT_SECRET!,
+                { expiresIn: "8h" }
             );
 
+            const permissions = storeUser.role?.rolePermissions.map(rp => ({
+                action: rp.permission.action,
+                resource: rp.permission.resource
+            })) || [];
+
+            await tx.auditLog.create({
+                data: {
+                    action: "STORE_USER_LOGIN",
+                    details: JSON.stringify({
+                        method: "email/password",
+                        device: data.userAgent
+                    }),
+                    userId: storeUser.id,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
+            });
+
             return {
-                storeUserId: storeUser.id,
+                id: storeUser.id,
                 name: storeUser.name,
                 email: storeUser.email,
-                role: storeUser.roleId,
+                roleId: storeUser.roleId,
+                storeId: storeUser.storeId,
                 token,
+                permissions
             };
-        } catch (error) {
-            console.error("Error authenticating store user:", error);
-            throw new Error(`Failed to authenticate store user. Error: ${error.message}`);
-        }
+        });
     }
 
-    // Função para validar o formato do e-mail
     private isValidEmail(email: string): boolean {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+    
+    private validateInput({ storeId, email, password }: AuthRequest) {
+        if (!storeId || isNaN(storeId)) throw new ValidationError("Invalid store ID");
+        if (!this.isValidEmail(email)) throw new ValidationError("Invalid email format");
+        if (password.length < 8) throw new ValidationError("Password must be at least 8 characters");
     }
 }
 

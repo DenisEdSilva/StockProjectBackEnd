@@ -60,6 +60,7 @@ model StoreUser {
   createdBy Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedBy Int
   deletedAt DateTime?
   isDeleted Boolean  @default(false)
 

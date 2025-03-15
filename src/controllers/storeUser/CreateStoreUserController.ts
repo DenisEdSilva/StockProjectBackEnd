@@ -8,12 +8,12 @@ class CreateStoreUserController {
 
             const createStoreUserService = new CreateStoreUserService();
             const storeUser = await createStoreUserService.execute({
-                userId,
                 name,
                 email,
                 password,
                 roleId,
-                storeId
+                storeId,
+                createdBy: userId
             });
 
             return res.status(201).json(storeUser);

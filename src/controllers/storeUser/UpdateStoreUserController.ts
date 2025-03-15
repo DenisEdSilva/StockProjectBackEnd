@@ -3,14 +3,21 @@ import { UpdateStoreUserService } from "../../services/storeUser/UpdateStoreUser
 
 class UpdateStoreUserController {
     async handle(req: Request, res: Response) {
-        try {
-            const updateStoreUserService = new UpdateStoreUserService();
-            const storeUser = await updateStoreUserService.execute(req.body);
+        const { id, storeId, name, email, password, roleId } = req.body;
+        const updatedBy = req.userId;
 
-            return res.status(200).json(storeUser);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        const service = new UpdateStoreUserService();
+        const result = await service.execute({
+            id: Number(id),
+            storeId: Number(storeId),
+            name,
+            email,
+            password,
+            roleId: roleId ? Number(roleId) : undefined,
+            updatedBy: Number(updatedBy)
+        });
+
+        return res.status(200).json(result);
     }
 }
 

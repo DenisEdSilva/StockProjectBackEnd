@@ -1,53 +1,48 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
-interface UserRequest {
-    storeId: number
+interface StoreUserACLResponse {
+    id: number;
+    name: string;
+    email: string;
+    permissions: Array<{ action: string; resource: string }>;
 }
 
 class ListStoreUserService {
-    async execute({ storeId }: UserRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
+    async execute(storeUserId: number): Promise<StoreUserACLResponse> {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!storeUserId || isNaN(storeUserId)) {
+                throw new ValidationError("ID de usuário inválido");
             }
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
+            const storeUser = await tx.storeUser.findUnique({
+                where: { id: storeUserId },
+                include: {
+                    role: {
+                        include: {
+                            rolePermissions: {
+                                include: { permission: true }
+                            }
+                        }
+                    }
+                }
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
+            if (!storeUser) throw new NotFoundError("Usuário não encontrado");
+            if (storeUser.isDeleted) throw new NotFoundError("Usuário desativado");
+            if (!storeUser.role) throw new ValidationError("Perfil não atribuído");
 
-            const storeUserList = await prismaClient.storeUser.findMany({
-                where: {
-                    storeId: storeId
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    roleId: true,
-                    storeId: true,
-                    createdAt: true
-                },
-                orderBy: {
-                    name: "asc"
-                }
-            })
-    
             return {
-                count: storeUserList.length,
-                users: storeUserList
-            }
-
-        } catch (error) {
-            console.error("Error on listing store users:", error);
-            throw new Error(`Failed on listing store users. Error: ${error.message}`);
-        }
+                id: storeUser.id,
+                name: storeUser.name,
+                email: storeUser.email,
+                permissions: storeUser.role.rolePermissions.map(rp => ({
+                    action: rp.permission.action,
+                    resource: rp.permission.resource
+                }))
+            };
+        });
     }
 }
 
-export { ListStoreUserService }
+export { ListStoreUserService };

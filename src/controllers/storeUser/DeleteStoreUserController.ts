@@ -3,22 +3,22 @@ import { DeleteStoreUserService } from "../../services/storeUser/DeleteStoreUser
 
 class DeleteStoreUserController {
     async handle(req: Request, res: Response) {
-        try {
-            const { id } = req.params;
-            const { userId, ipAddress, userAgent } = req.body;
+        const id = parseInt(req.params.id, 10);
+        const storeId = parseInt(req.params.storeId, 10);
+        const deletedBy = req.userId;
+        const ipAddress = req.ip;
+        const userAgent = req.headers['user-agent'] || '';
 
-            const deleteStoreUserService = new DeleteStoreUserService();
-            const result = await deleteStoreUserService.execute({
-                id: parseInt(id, 10),
-                userId: userId,
-                ipAddress: ipAddress,
-                userAgent: userAgent,
-            });
+        const service = new DeleteStoreUserService();
+        const result = await service.execute({
+            id,
+            storeId,
+            deletedBy: Number(deletedBy),
+            ipAddress,
+            userAgent
+        });
 
-            return res.status(200).json(result);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(result);
     }
 }
 
