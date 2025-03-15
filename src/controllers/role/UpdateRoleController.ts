@@ -1,19 +1,19 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { UpdateRoleService } from "../../services/role/UpdateRoleService";
 
 class UpdateRoleController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { roleId, name, storeId, permissionIds } = req.body;
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const { id: roleId } = req.params;
+        const { name, permissionIds } = req.body;
 
-            const updateRoleService = new UpdateRoleService();
+        const updateRoleService = new UpdateRoleService();
+        const role = await updateRoleService.execute({ 
+            roleId: parseInt(roleId, 10), 
+            name, 
+            permissionIds 
+        });
 
-            const role = await updateRoleService.execute({ roleId, name, storeId, permissionIds });
-
-            return res.json(role);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(role);
     }
 }
 

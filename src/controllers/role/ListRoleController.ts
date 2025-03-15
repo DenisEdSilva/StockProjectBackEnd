@@ -1,18 +1,14 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { ListRoleService } from "../../services/role/ListRoleService";
 
 class ListRoleController {
-    async handle(req: Request, res: Response) {
-        try {
-            const listRoleService = new ListRoleService();
-            const roleList = await listRoleService.execute({
-                storeId: req.body.storeId,
-            });
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const storeId = parseInt(req.params.storeId, 10);
 
-            return res.status(200).json(roleList);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        const listRoleService = new ListRoleService();
+        const roles = await listRoleService.execute({ storeId });
+
+        return res.status(200).json(roles);
     }
 }
 

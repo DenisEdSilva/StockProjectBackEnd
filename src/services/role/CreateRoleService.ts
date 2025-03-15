@@ -1,96 +1,48 @@
 import prismaClient from "../../prisma";
+import { ValidationError, ConflictError, NotFoundError } from "../../errors";
 
-interface RoleRequest {
+interface CreateRoleRequest {
     name: string;
     storeId: number;
     permissionIds: number[];
 }
 
 class CreateRoleService {
-    async execute({ name, storeId, permissionIds }: RoleRequest) {
-        try {
-            if (!name || typeof name !== "string" || name.trim() === "") {
-                throw new Error("Invalid role name");
+    async execute({ name, storeId, permissionIds }: CreateRoleRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!name?.trim()) throw new ValidationError("Nome do perfil inválido");
+            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+            if (!permissionIds?.length) throw new ValidationError("Deve conter pelo menos uma permissão");
+
+            const storeExists = await tx.store.findUnique({ where: { id: storeId } });
+            if (!storeExists) throw new NotFoundError("Loja não encontrada");
+
+            const roleExists = await tx.role.findFirst({ 
+                where: { name, storeId, isDeleted: false } 
+            });
+            if (roleExists) throw new ConflictError("Perfil já existe nesta loja");
+
+            const validPermissions = await tx.permission.count({ 
+                where: { id: { in: permissionIds } } 
+            });
+            if (validPermissions !== permissionIds.length) {
+                throw new ValidationError("Contém permissões inválidas");
             }
 
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+            const newRole = await tx.role.create({ data: { name, storeId } });
 
-            if (!Array.isArray(permissionIds) || permissionIds.length === 0) {
-                throw new Error("Permission IDs must be a non-empty array");
-            }
-
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
+            await tx.rolePermissionAssociation.createMany({
+                data: permissionIds.map(permissionId => ({
+                    roleId: newRole.id,
+                    permissionId
+                }))
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            const validPermissions = await prismaClient.permission.findMany({
-                where: {
-                    id: {
-                        in: permissionIds,
-                    },
-                },
-                select: {
-                    id: true,
-                },
+            return await tx.role.findUnique({
+                where: { id: newRole.id },
+                include: { rolePermissions: { include: { permission: true } } }
             });
-
-            const validPermissionIds = validPermissions.map((p) => p.id);
-            const invalidPermissionIds = permissionIds.filter(
-                (permissionId) => !validPermissionIds.includes(permissionId)
-            );
-
-            if (invalidPermissionIds.length > 0) {
-                throw new Error(`Invalid permission IDs: ${invalidPermissionIds.join(", ")}`);
-            }
-
-            const roleExists = await prismaClient.role.findFirst({
-                where: {
-                    name: name,
-                    storeId: storeId,
-                },
-            });
-
-            if (roleExists) {
-                throw new Error("Role already exists");
-            }
-
-            const result = await prismaClient.$transaction(async (prisma) => {
-                const role = await prisma.role.create({
-                    data: {
-                        name: name,
-                        storeId: storeId,
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        storeId: true
-                    },
-
-                });
-
-                await prisma.rolePermissionAssociation.createMany({
-                    data: permissionIds.map((permissionId) => ({
-                        roleId: role.id,
-                        permissionId: permissionId,
-                    })),
-                });
-
-                return role;
-            });
-
-            return result;
-        } catch (error) {
-            console.error("Error creating role:", error);
-            throw new Error(`Failed to create role. Error: ${error.message}`);
-        }
+        });
     }
 }
 

@@ -1,74 +1,34 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
 interface DeleteRoleRequest {
-    id: number;
+    roleId: number;
     userId: number;
-    ipAddress: string;
-    userAgent: string;
 }
 
 class DeleteRoleService {
-    async execute({ id, userId, ipAddress, userAgent }: DeleteRoleRequest) {
-        try {
-            if (!id) {
-                throw new Error("Role ID is required");
-            }
+    async execute({ roleId, userId }: DeleteRoleRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
 
-            const roleExists = await prismaClient.role.findUnique({
-                where: {
-                    id: id,
-                },
+            const role = await tx.role.findUnique({
+                where: { id: roleId },
+                include: { store: true }
+            });
+            if (!role) throw new NotFoundError("Perfil não encontrado");
+
+            if (role.store.ownerId !== userId) throw new ConflictError("Acesso não autorizado");
+
+            const usersCount = await tx.storeUser.count({ where: { roleId } });
+            if (usersCount > 0) throw new ConflictError("Perfil está em uso");
+
+            await tx.role.update({
+                where: { id: roleId },
+                data: { isDeleted: true, deletedAt: new Date() }
             });
 
-            if (!roleExists) {
-                throw new Error("Role not found");
-            }
-
-            const usersWithRole = await prismaClient.storeUser.findMany({
-                where: {
-                    roleId: id,
-                },
-                select: {
-                    id: true,
-                },
-            });
-
-            if (usersWithRole.length > 0) {
-                return {
-                    message: "Role cannot be deleted because it is still in use by the following users:",
-                    userIds: usersWithRole.map((user) => user.id),
-                };
-            }
-
-            const deletedRole = await prismaClient.role.update({
-                where: {
-                    id: id,
-                },
-                data: {
-                    isDeleted: true,
-                    deletedAt: new Date(),
-                },
-            });
-
-            await prismaClient.auditLog.create({
-                data: {
-                    action: "DELETE_ROLE",
-                    details: JSON.stringify({
-                        roleId: id,
-                        deletedAt: new Date(),
-                    }),
-                    userId: userId,
-                    storeId: roleExists.storeId,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                },
-            });
-
-            return { message: "Role marked as deleted successfully" };
-        } catch (error) {
-            console.error("Error on soft delete role: ", error);
-            throw new Error(`Failed to soft delete role. Error: ${error.message}`);
-        }
+            return { message: "Perfil marcado para exclusão" };
+        });
     }
 }
 

@@ -1,49 +1,29 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
-interface RoleRequest {
+interface ListRoleRequest {
     storeId: number;
 }
 
 class ListRoleService {
-    async execute({ storeId }: RoleRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+    async execute({ storeId }: ListRoleRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
-            });
+            const store = await tx.store.findUnique({ where: { id: storeId } });
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            const roleList = await prismaClient.role.findMany({
-                where: {
-                    storeId: storeId,
-                },
+            return await tx.role.findMany({
+                where: { storeId, isDeleted: false },
                 select: {
                     id: true,
                     name: true,
-                    storeId: true,
                     createdAt: true,
+                    _count: { select: { StoreUser: true, rolePermissions: true } }
                 },
-                orderBy: {
-                    name: "asc",
-                },
+                orderBy: { name: "asc" }
             });
-
-            return {
-                count: roleList.length,
-                roles: roleList,
-            };
-        } catch (error) {
-            console.error("Error on listing roles:", error);
-            throw new Error(`Failed on listing roles. Error: ${error.message}`);
-        }
+        });
     }
 }
 

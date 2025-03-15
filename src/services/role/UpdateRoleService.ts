@@ -1,146 +1,55 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
-interface RoleRequest {
+interface UpdateRoleRequest {
     roleId: number;
-    name?: string;
-    storeId?: number;
+    name: string;
     permissionIds: number[];
 }
 
 class UpdateRoleService {
-    async execute({ roleId, name, storeId, permissionIds }: RoleRequest) {
-        try {
-            if (!roleId || isNaN(roleId)) {
-                throw new Error("Invalid role ID");
-            }
+    async execute({ roleId, name, permissionIds }: UpdateRoleRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
+            if (!name?.trim()) throw new ValidationError("Nome inválido");
+            if (!permissionIds?.length) throw new ValidationError("Deve conter pelo menos uma permissão");
 
-            if (storeId && isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
-
-            if (!Array.isArray(permissionIds)) {
-                throw new Error("Permission IDs must be an array");
-            }
-
-            const roleExists = await prismaClient.role.findUnique({
-                where: {
-                    id: roleId,
-                },
+            const role = await tx.role.findUnique({ 
+                where: { id: roleId },
+                include: { rolePermissions: true }
             });
+            if (!role) throw new NotFoundError("Perfil não encontrado");
 
-            if (!roleExists) {
-                throw new Error("Role not found");
-            }
-
-            if (storeId) {
-                const storeExists = await prismaClient.store.findUnique({
-                    where: {
-                        id: storeId,
-                    },
-                });
-
-                if (!storeExists) {
-                    throw new Error("Store not found");
-                }
-            }
-
-            const validPermissions = await prismaClient.permission.findMany({
-                where: {
-                    id: {
-                        in: permissionIds,
-                    },
-                },
-                select: {
-                    id: true,
-                },
+            const validPermissions = await tx.permission.count({ 
+                where: { id: { in: permissionIds } } 
             });
-
-            const validPermissionIds = validPermissions.map((p) => p.id);
-            const invalidPermissionIds = permissionIds.filter(
-                (permissionId) => !validPermissionIds.includes(permissionId)
-            );
-
-            if (invalidPermissionIds.length > 0) {
-                throw new Error(`Invalid permission IDs: ${invalidPermissionIds.join(", ")}`);
+            if (validPermissions !== permissionIds.length) {
+                throw new ValidationError("Contém permissões inválidas");
             }
 
-            const uniquePermissionIds = [...new Set(permissionIds)];
-            if (uniquePermissionIds.length !== permissionIds.length) {
-                throw new Error("Duplicate permission IDs are not allowed.");
+            await tx.role.update({ where: { id: roleId }, data: { name } });
+
+            const currentIds = role.rolePermissions.map(rp => rp.permissionId);
+            const toAdd = permissionIds.filter(id => !currentIds.includes(id));
+            const toRemove = currentIds.filter(id => !permissionIds.includes(id));
+
+            if (toRemove.length > 0) {
+                await tx.rolePermissionAssociation.deleteMany({
+                    where: { roleId, permissionId: { in: toRemove } }
+                });
             }
 
-            const result = await prismaClient.$transaction(async (prisma) => {
-                const role = await prisma.role.update({
-                    where: {
-                        id: roleId,
-                    },
-                    data: {
-                        ...(name && { name: name }),
-                        ...(storeId && { storeId: storeId }),
-                    },
+            if (toAdd.length > 0) {
+                await tx.rolePermissionAssociation.createMany({
+                    data: toAdd.map(permissionId => ({ roleId, permissionId }))
                 });
+            }
 
-                const currentRolePermissions = await prisma.rolePermissionAssociation.findMany({
-                    where: {
-                        roleId: roleId,
-                    },
-                    select: {
-                        permissionId: true,
-                    },
-                });
-
-                const currentPermissionIds = currentRolePermissions.map((rp) => rp.permissionId);
-
-                const permissionsToAdd = uniquePermissionIds.filter(
-                    (permissionId) => !currentPermissionIds.includes(permissionId)
-                );
-
-                const permissionsToRemove = currentPermissionIds.filter(
-                    (permissionId) => !uniquePermissionIds.includes(permissionId)
-                );
-
-                if (permissionsToAdd.length > 0) {
-                    await prisma.rolePermissionAssociation.createMany({
-                        data: permissionsToAdd.map((permissionId) => ({
-                            roleId: role.id,
-                            permissionId: permissionId,
-                        })),
-                    });
-                }
-
-                if (permissionsToRemove.length > 0) {
-                    await prisma.rolePermissionAssociation.deleteMany({
-                        where: {
-                            roleId: role.id,
-                            permissionId: {
-                                in: permissionsToRemove,
-                            },
-                        },
-                    });
-                }
-
-                const updatedRolePermissions = await prisma.rolePermissionAssociation.findMany({
-                    where: {
-                        roleId: roleId,
-                    },
-                    select: {
-                        permissionId: true,
-                    },
-                });
-
-                return {
-                    role,
-                    addedPermissions: permissionsToAdd,
-                    removedPermissions: permissionsToRemove,
-                    currentPermissions: updatedRolePermissions.map((rp) => rp.permissionId),
-                };
+            return await tx.role.findUnique({
+                where: { id: roleId },
+                include: { rolePermissions: { include: { permission: true } } }
             });
-
-            return result;
-        } catch (error) {
-            console.error("Error updating role:", error);
-            throw new Error(`Failed to update role. Error: ${error.message}`);
-        }
+        });
     }
 }
 
