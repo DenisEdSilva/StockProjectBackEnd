@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface DeleteUserRequest {
     id: number;
@@ -6,45 +7,68 @@ interface DeleteUserRequest {
 
 class DeleteUserService {
     async execute({ id }: DeleteUserRequest) {
-        try {
-            if (!id) {
-                throw new Error("User ID is required");
+        return await prismaClient.$transaction(async (tx) => {
+            if (!id || isNaN(id)) {
+                throw new ValidationError("ID de usuário inválido");
             }
 
-            const user = await prismaClient.user.findUnique({
-                where: {
-                    id: id,
-                },
+            const user = await tx.user.findUnique({
+                where: { id },
                 include: {
-                    stores: true,
+                    ownedStores: {
+                        include: {
+                            categories: true,
+                            products: true,
+                            StockMoviment: true,
+                            StockMovimentStore: true
+                        }
+                    }
                 }
             });
 
             if (!user) {
-                throw new Error("User not found");
+                throw new NotFoundError("Usuário não encontrado");
             }
 
-            // preciso criar um metodo de enviar um email
-            // para o usuário e informar 
-            // o periodo que ele possui antes da remoção 
-            // pois ele precisa saber que precisa fazer o backup
+            if (user.isOwner) {
+                throw new ForbiddenError("Usuários proprietários requerem um processo de exclusão especial");
+            }
 
-            await prismaClient.user.update({
-                where: {
-                    id: id,
-                },
+            const gracePeriod = process.env.DELETION_GRACE_PERIOD 
+                ? parseInt(process.env.DELETION_GRACE_PERIOD)
+                : 30;
+
+            if (isNaN(gracePeriod)) {
+                throw new ValidationError("Período de graça para exclusão inválido");
+            }
+
+            const deletionDate = new Date();
+            deletionDate.setMinutes(deletionDate.getMinutes() + gracePeriod);
+
+            await tx.user.update({
+                where: { id },
+                data: { markedForDeletionAt: deletionDate }
+            });
+
+            await tx.store.deleteMany({ where: { ownerId: id } });
+
+            await tx.auditLog.create({
                 data: {
-                    markedForDeletionAt: new Date(),
+                    action: "USER_MARKED_FOR_DELETION",
+                    details: JSON.stringify({ userId: id, scheduledDeletion: deletionDate }),
+                    userId: id,
+                    ipAddress: "system",
+                    userAgent: "cron-job",
+                    isOwner: true
                 }
-            })
+            });
 
-
-
-            return { message: "User marked for deletion. Data will be removed in 30 days" };           
-
-        } catch (error) {
-            console.log("Error marking user for deletion: ", error);
-            throw new Error(`Failed to mark user for deletion. Error: ${error.message}`);
-        }
+            return { 
+                message: "Usuário marcado para exclusão",
+                scheduledDeletion: deletionDate 
+            };
+        });
     }
 }
+
+export { DeleteUserService };

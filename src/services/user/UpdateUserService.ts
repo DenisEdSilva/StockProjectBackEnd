@@ -1,5 +1,6 @@
 import prismaClient from "../../prisma";
 import { hash } from "bcryptjs";
+import { ValidationError, ConflictError, NotFoundError } from "../../errors";
 
 interface UserRequest {
     userId: number;
@@ -12,72 +13,79 @@ interface UserRequest {
 
 class UpdateUserService {
     async execute({ userId, name, email, password, ipAddress, userAgent }: UserRequest) {
-        try {
+        return await prismaClient.$transaction(async (tx) => {
             if (!userId || isNaN(userId)) {
-                throw new Error("Invalid user ID");
+                throw new ValidationError("ID de usuário inválido");
             }
 
-            const userExists = await prismaClient.user.findUnique({
-                where: {
-                    id: userId,
-                },
+            const userExists = await tx.user.findUnique({
+                where: { id: userId }
             });
 
             if (!userExists) {
-                throw new Error("User not found");
+                throw new NotFoundError("Usuário não encontrado");
             }
 
-            if (email && !this.isValidEmail(email)) {
-                throw new Error("Invalid email");
+            if (email) {
+                if (!this.isValidEmail(email)) {
+                    throw new ValidationError("Formato de email inválido");
+                }
+
+                const emailUser = await tx.user.findFirst({
+                    where: { email, NOT: { id: userId } }
+                });
+
+                if (emailUser) {
+                    throw new ConflictError("Email já está em uso");
+                }
             }
 
-            if (password && password.length < 6) {
-                throw new Error("Password must be at least 6 characters long");
+            if (password) {
+                if (!this.isPasswordStrong(password)) {
+                    throw new ValidationError("A senha deve ter pelo menos 8 caracteres, uma letra maiúscula, uma minúscula e um número");
+                }
             }
 
-            const passwordHash = password ? await hash(password, 8) : undefined;
+            const updateData: any = {};
+            if (name) updateData.name = name;
+            if (email) updateData.email = email;
+            if (password) updateData.password = await hash(password, 10);
 
-            const user = await prismaClient.user.update({
-                where: {
-                    id: userId,
-                },
-                data: {
-                    ...(name && { name: name }),
-                    ...(email && { email: email }),
-                    ...(passwordHash && { password: passwordHash }),
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                },
+            const updatedUser = await tx.user.update({
+                where: { id: userId },
+                data: updateData,
+                select: { id: true, name: true, email: true }
             });
 
-            await prismaClient.auditLog.create({
+            await tx.auditLog.create({
                 data: {
-                    action: "UPDATE_USER",
+                    action: "USER_UPDATED",
                     details: JSON.stringify({
-                        userId: user.id,
-                        name: user.name,
-                        email: user.email,
+                        changedFields: Object.keys(updateData),
+                        oldEmail: userExists.email,
+                        newEmail: email || userExists.email
                     }),
-                    userId: user.id,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                    isOwner: userExists.isOwner,
-                },
+                    userId: updatedUser.id,
+                    ipAddress,
+                    userAgent,
+                    isOwner: true
+                }
             });
 
-            return user;
-        } catch (error) {
-            console.error("Error updating user:", error);
-            throw new Error(`Failed to update user. Error: ${error.message}`);
-        }
+            return updatedUser;
+        });
     }
 
     private isValidEmail(email: string): boolean {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
+    }
+
+    private isPasswordStrong(password: string): boolean {
+        return password.length >= 8 &&
+               /[A-Z]/.test(password) &&
+               /[a-z]/.test(password) &&
+               /[0-9]/.test(password);
     }
 }
 

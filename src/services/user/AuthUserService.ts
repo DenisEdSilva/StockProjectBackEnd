@@ -2,6 +2,12 @@ import prismaClient from "../../prisma";
 import { compare } from "bcryptjs";
 import { sign } from "jsonwebtoken";
 import { redisClient } from "../../redis.config";
+import { 
+    ValidationError, 
+    NotFoundError, 
+    UnauthorizedError, 
+    ForbiddenError 
+} from "../../errors";
 
 interface AuthRequest {
     email: string;
@@ -12,81 +18,80 @@ interface AuthRequest {
 
 class AuthUserService {
     async execute({ email, password, ipAddress, userAgent }: AuthRequest) {
-        try {
-            if (!email || !this.isValidEmail(email)) {
-                throw new Error("Invalid email");
-            }
-
-            if (!password || password.length < 6) {
-                throw new Error("Invalid password");
-            }
-
-            const user = await prismaClient.user.findFirst({
-                where: {
-                    email: email,
-                },
-            });
-
-            if (!user) {
-                throw new Error("User or password incorrect");
-            }
-
-            const passwordMatch = await compare(password, user.password);
-
-            if (!passwordMatch) {
-                throw new Error("User or password incorrect");
-            }
-
-            const token = sign(
-                {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    isOwner: user.isOwner,
-                },
-                process.env.JWT_SECRET,
-                {
-                    subject: user.id.toString(),
-                    expiresIn: "30d",
-                }
-            );
-
-            const userData = {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                isOwner: user.isOwner,
-                permissions: [],
-            };
-
-            await redisClient.set(`user:${user.id}`, JSON.stringify(userData));
-
-            await prismaClient.auditLog.create({
-                data: {
-                    action: "AUTH_USER",
-                    details: JSON.stringify({
-                        userId: user.id,
-                        email: user.email,
-                        isOwner: user.isOwner,
-                    }),
-                    userId: user.id,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                    isOwner: user.isOwner,
-                },
-            });
-
-            return {
-                user: user.id,
-                name: user.name,
-                email: user.email,
-                isOwner: user.isOwner,
-                token,
-            };
-        } catch (error) {
-            console.error("Error authenticating user:", error);
-            throw new Error(`Failed to authenticate user. Error: ${error.message}`);
+        if (!this.isValidEmail(email)) {
+            throw new ValidationError("Formato de email inválido");
         }
+
+        if (!password || password.length < 8) {
+            throw new ValidationError("Senha deve ter pelo menos 8 caracteres");
+        }
+
+        const user = await prismaClient.user.findFirst({
+            where: { email },
+            include: { 
+                ownedStores: {
+                    include: {
+                        roles: true,
+                        storeUsers: {
+                            select: { name: true, email: true, role: true },
+                            where: { isDeleted: false }
+                        },
+                        categories: true,
+                        products: true,
+                        StockMoviment: true
+                    }
+                } 
+            }
+        });
+
+        if (user?.markedForDeletionAt) {
+            throw new ForbiddenError("Conta marcada para exclusão. Entre em contato com o suporte");
+        }
+
+        if (!user) {
+            throw new NotFoundError("Credenciais inválidas");
+        }
+
+        const passwordMatch = await compare(password, user.password);
+        if (!passwordMatch) {
+            throw new UnauthorizedError("Credenciais inválidas");
+        }
+
+        await prismaClient.user.update({
+            where: { id: user.id },
+            data: { lastActivityAt: new Date() }
+        });
+
+        const token = sign(
+            { id: user.id, name: user.name, email: user.email, isOwner: user.isOwner },
+            process.env.JWT_SECRET!,
+            { expiresIn: "30d" }
+        );
+
+        await redisClient.set(`user:${user.id}`, JSON.stringify({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isOwner: user.isOwner,
+            permissions: []
+        }));
+
+        await prismaClient.auditLog.create({
+            data: {
+                action: "USER_LOGIN",
+                details: JSON.stringify({ method: "email/password", device: userAgent }),
+                userId: user.id,
+                ipAddress,
+                userAgent,
+                isOwner: user.isOwner
+            }
+        });
+
+        return { 
+            ...user,
+            token,
+            stores: user.ownedStores
+        };
     }
 
     private isValidEmail(email: string): boolean {

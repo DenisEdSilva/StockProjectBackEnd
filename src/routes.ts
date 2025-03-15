@@ -87,7 +87,7 @@ router.put("/me", authenticated, async (req: Request, res: Response): Promise<vo
 })
 
 // detalhando um usuário
-router.get("/me", authenticated, async (req: Request, res: Response): Promise<void> => {
+router.get("/me", authenticated, authorized("ONLY", "OWNER"), async (req: Request, res: Response): Promise<void> => {
     const detailUserController = new DetailUserController();
     await detailUserController.handle(req, res);
 })

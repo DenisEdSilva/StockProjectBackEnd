@@ -19,23 +19,10 @@ model User {
   deletionWarningSentAt DateTime? 
   markedForDeletionAt   DateTime?
   
-  userStores UserStore[]
-  stores     Store[]     @relation("UserStore")
-  Store      Store[]
+  ownedStores Store[] @relation("StoreOwner")
   AuditLog   AuditLog[]
 
   @@map("users")
-}
-
-model UserStore {
-  id      Int   @id @default(autoincrement())
-  userId  Int
-  storeId Int
-
-  user  User  @relation(fields: [userId], references: [id])
-  store Store @relation(fields: [storeId], references: [id])
-
-  @@unique([userId, storeId])
 }
 
 model Store {
@@ -51,14 +38,12 @@ model Store {
   isDeleted      Boolean  @default(false)
   lastActivityAt DateTime?
 
-  owner           User              @relation(fields: [ownerId], references: [id])
-  userStores      UserStore[]
+  owner    User   @relation("StoreOwner", fields: [ownerId], references: [id])
   storeUsers      StoreUser[]
   categories      Category[]
   products        Product[]
   StockMoviment   StockMoviment[]
   roles           Role[]            @relation("RoleStoreRelation")
-  User            User[]            @relation("UserStore")
   StockMovimentStore StockMovimentStore[]
   AuditLog        AuditLog[]
 
@@ -79,6 +64,7 @@ model StoreUser {
   isDeleted Boolean  @default(false)
 
   store    Store    @relation(fields: [storeId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id], name: "StoreUserRoleRelation")
   AuditLog AuditLog[]
 }
 
@@ -94,6 +80,7 @@ model Role {
   store                Store                   @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
   rolePermissions      RolePermissionAssociation[] @relation("RoleToPermission")
   RolePermissionAssociation RolePermissionAssociation[]
+  StoreUser StoreUser[] @relation(name: "StoreUserRoleRelation")
 
   @@unique([name, storeId])
 }
