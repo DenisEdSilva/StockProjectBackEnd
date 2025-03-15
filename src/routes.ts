@@ -34,6 +34,7 @@ import { ListStoreUserController } from "./controllers/storeUser/ListStoreUserCo
 import { UpdateStoreUserController } from "./controllers/storeUser/UpdateStoreUserController";
 import { AuthStoreUserController } from "./controllers/storeUser/AuthStoreUserController";
 import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUserController";
+import { CreateStoreUserAccessControlListController } from "./controllers/storeUser/CreateStoreUserAccessControlListController";
 
 // CATEGORY CONTROLLERS
 import { CreateCategoryController } from "./controllers/category/CreateCategoryController";
@@ -52,6 +53,9 @@ import { CreateStockController } from "./controllers/stock/CreateStockController
 import { ListMovimentStockController } from "./controllers/stock/ListMovimentStockController";
 import { RevertStockController } from "./controllers/stock/RevertStockController";
 
+// AUDIT CONTROLLERS
+import { AuditLogController } from "./controllers/audit/AuditLogController";
+
 // MIDDLEWARES
 import { authenticated } from "./middlewares/authenticated";
 import { authorized } from "./middlewares/authorized";
@@ -59,204 +63,270 @@ import { authorized } from "./middlewares/authorized";
 const router = Router();
 
 // PERMISSION ROUTES
-router.post("/permission", async (req: Request, res: Response): Promise<void> => {
-    const createPermissionController = new CreatePermissionController();
-    await createPermissionController.handle(req, res);
-});
+router.post("/permissions",
+  authenticated,
+  authorized("POST", "PERMISSION"),
+  (req: Request, res: Response) => {
+    new CreatePermissionController().handle(req, res,);
+  }
+);
 
 // USER ROUTES
+router.post("/users",
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateUserController().handle(req, res, next);
+  }
+);
 
-// criando um usuário (owner)
-router.post("/users", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const createUserController = new CreateUserController();
-    await createUserController.handle(req, res, next);
-});
+router.post("/sessions",
+  (req: Request, res: Response, next: NextFunction) => {
+    new AuthUserController().handle(req, res, next);
+  }
+);
 
-// autenticando um usuário
-router.post("/session", async (req: Request, res: Response): Promise<void> => {
-    const authUserController = new AuthUserController();
-    await authUserController.handle(req, res);
-})
+router.get("/me",
+  authenticated,
+  authorized("GET", "USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DetailUserController().handle(req, res, next);
+  }
+);
 
-// atualizando um usuário
-router.put("/me", authenticated, async (req: Request, res: Response): Promise<void> => {
-    const updateUserController = new UpdateUserController();
-    await updateUserController.handle(req, res);
-})
+router.put("/me",
+  authenticated,
+  authorized("PUT", "USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateUserController().handle(req, res, next);
+  }
+);
 
-// detalhando um usuário
-router.get("/me", authenticated, authorized("ONLY", "OWNER"), async (req: Request, res: Response): Promise<void> => {
-    const detailUserController = new DetailUserController();
-    await detailUserController.handle(req, res);
-})
-
-// deletando um usuário
-router.delete("/me/delete", authenticated, authorized("ONLY", "OWNER"), async (req: Request, res: Response): Promise<void> => {
-    const deleteUserController = new DeleteUserController();
-    await deleteUserController.handle(req, res);
-})
+router.delete("/me",
+  authenticated,
+  authorized("DELETE", "USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteUserController().handle(req, res, next);
+  }
+);
 
 // STORE ROUTES
+router.post("/stores",
+  authenticated,
+  authorized("POST", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateStoreController().handle(req, res, next);
+  }
+);
 
-// criando uma loja
-router.post("/store", authenticated, authorized("POST", "STORE"), async (req: Request, res: Response): Promise<void> => {
-    const createStoreController = new CreateStoreController();
-    await createStoreController.handle(req, res);
-})
+router.get("/stores",
+  authenticated,
+  authorized("GET", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListStoreController().handle(req, res, next);
+  }
+);
 
-// listando as lojas
-router.get("/store", authenticated, authorized("GET", "STORE"), async (req: Request, res: Response): Promise<void> => {
-    const listStorecontroller = new ListStoreController();
-    await listStorecontroller.handle(req, res);
-})
+router.put("/stores/:id",
+  authenticated,
+  authorized("PUT", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateStoreController().handle(req, res, next);
+  }
+);
 
-// atualizando uma loja
-router.put("/store", authenticated, authorized("PUT", "STORE"), async (req: Request, res: Response): Promise<void> => {
-    const updateStoreController = new UpdateStoreController();
-    await updateStoreController.handle(req, res);
-})
+router.delete("/stores/:id",
+  authenticated,
+  authorized("DELETE", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteStoreController().handle(req, res, next);
+  }
+);
 
-// deletando uma loja
-router.delete("/store", authenticated, authorized("DELETE", "STORE"), async (req: Request, res: Response): Promise<void> => {
-    const deleteStoreController = new DeleteStoreController();
-    await deleteStoreController.handle(req, res);
-})
-
-// reverte a loja deletada
-router.post("/store/revert", authenticated, authorized("POST", "STORE"), async (req: Request, res: Response): Promise<void> => {
-    const revertStoreController = new RevertDeleteStoreController();
-    await revertStoreController.handle(req, res);
-})
+router.post("/stores/:id/revert",
+  authenticated,
+  authorized("POST", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new RevertDeleteStoreController().handle(req, res, next);
+  }
+);
 
 // ROLE ROUTES
+router.post("/roles",
+  authenticated,
+  authorized("POST", "ROLE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateRoleController().handle(req, res, next);
+  }
+);
 
-// criando uma role
-router.post("/role", authenticated, authorized("POST", "ROLE"), async (req: Request, res: Response): Promise<void> => {
-    const createRoleController = new CreateRoleController();
-    await createRoleController.handle(req, res);
-})
+router.get("/roles",
+  authenticated,
+  authorized("GET", "ROLE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListRoleController().handle(req, res, next);
+  }
+);
 
-// atualizando uma role
-router.put("/role", authenticated, authorized("PUT", "ROLE"), async (req: Request, res: Response): Promise<void> => {
-    const updateRoleController = new UpdateRoleController();
-    await updateRoleController.handle(req, res);
-})
+router.put("/roles/:id",
+  authenticated,
+  authorized("PUT", "ROLE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateRoleController().handle(req, res, next);
+  }
+);
 
-// listando as roles
-router.get("/role", authenticated, authorized("GET", "ROLE"), async (req: Request, res: Response): Promise<void> => {
-    const listRoleController = new ListRoleController();
-    await listRoleController.handle(req, res);
-})
-
-// deletando uma role
-router.delete("/role", authenticated, authorized("DELETE", "ROLE"), async (req: Request, res: Response): Promise<void> => {
-    const deleteRoleController = new DeleteRoleController();
-    await deleteRoleController.handle(req, res);
-})
-
+router.delete("/roles/:id",
+  authenticated,
+  authorized("DELETE", "ROLE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteRoleController().handle(req, res, next);
+  }
+);
 
 // STORE USER ROUTES
+router.post("/store/users",
+  authenticated,
+  authorized("POST", "STORE_USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateStoreUserController().handle(req, res, next);
+  }
+);
 
-// criando um usuário
-router.post("/store/user", authenticated, authorized("POST", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
-    const createStoreUserController = new CreateStoreUserController();
-    await createStoreUserController.handle(req, res);
-})
+router.post("/store/sessions",
+  (req: Request, res: Response, next: NextFunction) => {
+    new AuthStoreUserController().handle(req, res, next);
+  }
+);
 
-// autenticando um usuário
-router.post("/store/session", async (req: Request, res: Response): Promise<void> => {
-    const authStoreUserController = new AuthStoreUserController();
-    await authStoreUserController.handle(req, res);
-})
+router.get("/store/users",
+  authenticated,
+  authorized("GET", "STORE_USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListStoreUserController().handle(req, res, next);
+  }
+);
 
-// atualizando um usuário
-router.put("/store/user", authenticated, authorized("PUT", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
-    const updateStoreUserController = new UpdateStoreUserController();
-    await updateStoreUserController.handle(req, res);
-})
+router.put("/store/users/:id",
+  authenticated,
+  authorized("PUT", "STORE_USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateStoreUserController().handle(req, res, next);
+  }
+);
 
-// listando usuários
-router.get("/store/user", authenticated, authorized("GET", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
-    const listStoreUserController = new ListStoreUserController();
-    await listStoreUserController.handle(req, res);
-})
+router.delete("/store/users/:id",
+  authenticated,
+  authorized("DELETE", "STORE_USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteStoreUserController().handle(req, res, next);
+  }
+);
 
-// deletando um usuário
-router.delete("/store/user", authenticated, authorized("DELETE", "STORE_USER"), async (req: Request, res: Response): Promise<void> => {
-    const deleteStoreUserController = new DeleteStoreUserController();
-    await deleteStoreUserController.handle(req, res);
-})
+router.post("/store/users/:id/acl",
+  authenticated,
+  authorized("POST", "STORE_USER_ACL"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateStoreUserAccessControlListController().handle(req, res, next);
+  }
+);
 
 // CATEGORY ROUTES
+router.post("/categories",
+  authenticated,
+  authorized("POST", "CATEGORY"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateCategoryController().handle(req, res, next);
+  }
+);
 
-// criando uma categoria
-router.post("/category", authenticated, authorized("POST", "CATEGORY"), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const createCategoryController = new CreateCategoryController();
-    await createCategoryController.handle(req, res);
-})
+router.get("/categories",
+  authenticated,
+  authorized("GET", "CATEGORY"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListCategoryController().handle(req, res, next);
+  }
+);
 
-// listando categorias
-router.get("/category", authenticated, authorized("GET", "CATEGORY"), async (req: Request, res: Response): Promise<void> => {
-    const listCategoryController = new ListCategoryController();
-    await listCategoryController.handle(req, res);
-})
+router.put("/categories/:id",
+  authenticated,
+  authorized("PUT", "CATEGORY"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateCategoryController().handle(req, res, next);
+  }
+);
 
-// atualizando uma categoria
-router.put("/category", authenticated, authorized("PUT", "CATEGORY"), async (req: Request, res: Response): Promise<void> => {
-    const updateCategoryController = new UpdateCategoryController();
-    await updateCategoryController.handle(req, res);
-});
-
-// deletando uma categoria
-router.delete("/category", authenticated, authorized("DELETE", "CATEGORY"), async (req: Request, res: Response): Promise<void> => {
-    const deleteCategoryController = new DeleteCategoryController();
-    await deleteCategoryController.handle(req, res);
-});
+router.delete("/categories/:id",
+  authenticated,
+  authorized("DELETE", "CATEGORY"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteCategoryController().handle(req, res, next);
+  }
+);
 
 // PRODUCT ROUTES
+router.post("/products",
+  authenticated,
+  authorized("POST", "PRODUCT"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateProductController().handle(req, res, next);
+  }
+);
 
-// criando um produto
-router.post("/product", authenticated, authorized("POST", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
-    const createProductController = new CreateProductController();
-    await createProductController.handle(req, res);
-})
+router.get("/products",
+  authenticated,
+  authorized("GET", "PRODUCT"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListProductController().handle(req, res, next);
+  }
+);
 
-// listando produtos
-router.get("/product", authenticated, authorized("GET", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
-    const listProductController = new ListProductController();
-    await listProductController.handle(req, res);
-})
+router.put("/products/:id",
+  authenticated,
+  authorized("PUT", "PRODUCT"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new UpdateProductController().handle(req, res, next);
+  }
+);
 
-// atualizando um produto
-router.put("/product", authenticated, authorized("PUT", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
-    const updateProductController = new UpdateProductController();
-    await updateProductController.handle(req, res);
-});
-
-// deletando um produto
-router.delete("/product", authenticated, authorized("DELETE", "PRODUCT"), async (req: Request, res: Response): Promise<void> => {
-    const deleteProductController = new DeleteProductController();
-    await deleteProductController.handle(req, res);
-});
+router.delete("/products/:id",
+  authenticated,
+  authorized("DELETE", "PRODUCT"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new DeleteProductController().handle(req, res, next);
+  }
+);
 
 // STOCK ROUTES
+router.post("/stock/movements",
+  authenticated,
+  authorized("POST", "STOCK"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new CreateStockController().handle(req, res, next);
+  }
+);
 
-// criando um movimento
-router.post("/stock", authenticated, authorized("POST", "STOCK"), async (req: Request, res: Response): Promise<void> => {
-    const createStockController = new CreateStockController();
-    await createStockController.handle(req, res);
-})
+router.get("/stock/movements",
+  authenticated,
+  authorized("GET", "STOCK"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListMovimentStockController().handle(req, res, next);
+  }
+);
 
-// revertendo um movimento
-router.post("/revertMoviment", authenticated, authorized("POST", "STOCK"), async (req: Request, res: Response): Promise<void> => {
-    const revertStockController = new RevertStockController();
-    await revertStockController.handle(req, res);
-})
+router.post("/stock/movements/:id/revert",
+  authenticated,
+  authorized("POST", "STOCK"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new RevertStockController().handle(req, res, next);
+  }
+);
 
-// listando movimentos
-router.get("/stockMoviment", authenticated, authorized("GET", "STOCK"), async (req: Request, res: Response): Promise<void> => {
-    const listMovimentStockController = new ListMovimentStockController();
-    await listMovimentStockController.handle(req, res);
-})
+// AUDIT ROUTES
+router.get("/audit-logs",
+  authenticated,
+  authorized("GET", "AUDIT_LOG"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new AuditLogController().handle(req, res, next);
+  }
+);
 
 export { router };
