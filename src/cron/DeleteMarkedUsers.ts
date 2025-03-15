@@ -15,7 +15,7 @@ async function deleteMarkedUsers() {
         markedForDeletionAt: { lt: cutoffDate },
       },
       include: {
-        stores: {
+        ownedStores: {
           include: {
             products: true,
             categories: true
