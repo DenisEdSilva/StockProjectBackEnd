@@ -32,6 +32,39 @@ class CreateCategoryService {
                 select: { id: true, name: true, createdAt: true }
             });
 
+            const isOwnerAction = await tx.user.findUnique({ 
+                where: { 
+                    id: userId 
+                },
+                select: {
+                    id: true,
+                }
+            });
+
+            const updates = [];
+
+            updates.push(
+                tx.store.update({
+                    where: { id: storeId },
+                    data: {
+                        lastActivityAt: new Date(),
+                    }
+                })
+            );
+            
+            if (isOwnerAction) {
+                updates.push(
+                    tx.user.update({
+                        where: { id: userId },
+                        data: {
+                            lastActivityAt: new Date(),
+                        }
+                    })
+                )
+            }
+
+            await Promise.all(updates);
+
             await tx.auditLog.create({
                 data: {
                     action: "CATEGORY_CREATED",
