@@ -15,13 +15,6 @@ interface ProductRequest {
 }
 
 class CreateProductService {
-    private validateInput(data: ProductRequest) {
-        if (!data.banner?.trim()) throw new ValidationError("Banner obrigatório");
-        if (!data.name?.trim()) throw new ValidationError("Nome obrigatório");
-        if (data.stock < 0) throw new ValidationError("Estoque inválido");
-        if (isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
-    }
-
     async execute(data: ProductRequest) {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
@@ -52,6 +45,13 @@ class CreateProductService {
 
             return product;
         });
+    }
+
+    private validateInput(data: ProductRequest) {
+        if (!data.banner?.trim()) throw new ValidationError("Banner obrigatório");
+        if (!data.name?.trim()) throw new ValidationError("Nome obrigatório");
+        if (data.stock < 0) throw new ValidationError("Estoque inválido");
+        if (isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
     }
 }
 

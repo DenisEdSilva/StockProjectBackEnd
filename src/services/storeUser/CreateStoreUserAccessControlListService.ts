@@ -14,12 +14,6 @@ interface ACLResponse {
 }
 
 class CreateStoreUserAccessControlListService {
-    private validateInput(storeUserId: number) {
-        if (!storeUserId || isNaN(storeUserId)) {
-            throw new ValidationError("ID de usuário inválido");
-        }
-    }
-
     async execute({ storeUserId }: UserACLRequest): Promise<ACLResponse> {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(storeUserId);
@@ -64,6 +58,12 @@ class CreateStoreUserAccessControlListService {
                 permissions
             };
         });
+    }
+    
+    private validateInput(storeUserId: number) {
+        if (!storeUserId || isNaN(storeUserId)) {
+            throw new ValidationError("ID de usuário inválido");
+        }
     }
 }
 

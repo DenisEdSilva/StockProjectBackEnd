@@ -9,24 +9,6 @@ interface RevertDeleteStoreRequest {
 }
 
 class RevertDeleteStoreService {
-    private async restoreRelatedRecords(storeId: number, tx: any) {
-        const models = [
-            'stockMovimentStore',
-            'stockMoviment',
-            'product',
-            'category',
-            'storeUser',
-            'role'
-        ];
-
-        await Promise.all(models.map(model => 
-            tx[model].updateMany({
-                where: { storeId },
-                data: { isDeleted: false, deletedAt: null }
-            })
-        ));
-    }
-
     async execute(data: RevertDeleteStoreRequest) {
         return await prismaClient.$transaction(async (tx) => {
             if (!data.storeId || isNaN(data.storeId)) {
@@ -66,6 +48,24 @@ class RevertDeleteStoreService {
 
             return restoredStore;
         });
+    }
+
+    private async restoreRelatedRecords(storeId: number, tx: any) {
+        const models = [
+            'stockMovimentStore',
+            'stockMoviment',
+            'product',
+            'category',
+            'storeUser',
+            'role'
+        ];
+
+        await Promise.all(models.map(model => 
+            tx[model].updateMany({
+                where: { storeId },
+                data: { isDeleted: false, deletedAt: null }
+            })
+        ));
     }
 }
 

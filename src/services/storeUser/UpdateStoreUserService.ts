@@ -17,13 +17,6 @@ interface UpdateRequest {
 }
 
 class UpdateStoreUserService {
-    private validateInput(data: UpdateRequest) {
-        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
-        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
-        if (data.email && !this.isValidEmail(data.email)) throw new ValidationError("Formato de email inválido");
-        if (data.password && data.password.length < 8) throw new ValidationError("Senha deve ter 8+ caracteres");
-    }
-
     async execute(data: UpdateRequest) {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
@@ -81,6 +74,13 @@ class UpdateStoreUserService {
 
             return updatedUser;
         });
+    }
+
+    private validateInput(data: UpdateRequest) {
+        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
+        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+        if (data.email && !this.isValidEmail(data.email)) throw new ValidationError("Formato de email inválido");
+        if (data.password && data.password.length < 8) throw new ValidationError("Senha deve ter 8+ caracteres");
     }
 
     private isValidEmail(email: string): boolean {

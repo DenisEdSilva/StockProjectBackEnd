@@ -13,12 +13,6 @@ interface DeleteRequest {
 }
 
 class DeleteStoreUserService {
-    private validateInput(data: DeleteRequest) {
-        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
-        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
-        if (!data.deletedBy || isNaN(data.deletedBy)) throw new ValidationError("ID do executor inválido");
-    }
-
     async execute(data: DeleteRequest) {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
@@ -55,6 +49,12 @@ class DeleteStoreUserService {
 
             return { success: true };
         });
+    }
+    
+    private validateInput(data: DeleteRequest) {
+        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
+        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+        if (!data.deletedBy || isNaN(data.deletedBy)) throw new ValidationError("ID do executor inválido");
     }
 }
 

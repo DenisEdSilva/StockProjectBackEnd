@@ -13,11 +13,6 @@ interface UpdateProductRequest {
 }
 
 class UpdateProductService {
-    private validateInput(data: UpdateProductRequest) {
-        if (data.price && isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
-        if (data.name?.length > 100) throw new ValidationError("Nome muito longo (máx. 100 caracteres)");
-    }
-
     async execute(data: UpdateProductRequest) {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
@@ -51,6 +46,11 @@ class UpdateProductService {
 
             return updatedProduct;
         });
+    }
+
+    private validateInput(data: UpdateProductRequest) {
+        if (data.price && isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
+        if (data.name?.length > 100) throw new ValidationError("Nome muito longo (máx. 100 caracteres)");
     }
 }
 
