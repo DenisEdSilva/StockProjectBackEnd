@@ -3,38 +3,75 @@ import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface UpdateStoreRequest {
     id: number;
-    name: string;
-    city: string;
-    state: string;
-    zipCode: string;
     userId: number;
     ipAddress: string;
     userAgent: string;
+    name?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
 }
 
 class UpdateStoreService {
     async execute(data: UpdateStoreRequest) {
         return await prismaClient.$transaction(async (tx) => {
-            this.validateUpdate(data);
+            if (!data.id || isNaN(data.id)) throw new ValidationError("ID da loja inválido");
 
             const store = await tx.store.findUnique({
                 where: { id: data.id },
-                select: { ownerId: true }
+                select: { ownerId: true, name: true, city: true, state: true, zipCode: true }
             });
 
             if (!store) throw new NotFoundError("Loja não encontrada");
             if (store.ownerId !== data.userId) throw new ForbiddenError("Acesso não autorizado");
 
+            const updateData: Record<string, any> = {};
+
+            if (data.name !== undefined && data.name !== store.name) {
+                updateData.name = data.name;
+            }
+            if (data.city !== undefined && data.city !== store.city) {
+                updateData.city = data.city;
+            }
+            if (data.state !== undefined) {
+                if (data.state.length !== 2) throw new ValidationError("Sigla do estado deve ter 2 caracteres");
+                if (data.state !== store.state) updateData.state = data.state;
+            }
+            if (data.zipCode !== undefined && data.zipCode !== store.zipCode) {
+                updateData.zipCode = data.zipCode;
+            }
+
+            if (Object.keys(updateData).length === 0) {
+                return { 
+                    message: "Nenhuma alteração necessária",
+                    store: { ...store, ...updateData }
+                };
+            }
+
             const updatedStore = await tx.store.update({
                 where: { id: data.id },
-                data: { name: data.name, city: data.city, state: data.state, zipCode: data.zipCode },
+                data: updateData,
                 select: { id: true, name: true, city: true, state: true, zipCode: true }
             });
+
+            await Promise.all([
+                tx.store.update({
+                    where: { id: data.id },
+                    data: { lastActivityAt: new Date() }
+                }),
+                tx.user.update({
+                    where: { id: data.userId },
+                    data: { lastActivityAt: new Date() }
+                })
+            ]);
 
             await tx.auditLog.create({
                 data: {
                     action: "STORE_UPDATED",
-                    details: JSON.stringify(updatedStore),
+                    details: JSON.stringify({
+                        from: store,
+                        to: updatedStore
+                    }),
                     userId: data.userId,
                     storeId: data.id,
                     ipAddress: data.ipAddress,
@@ -44,11 +81,6 @@ class UpdateStoreService {
 
             return updatedStore;
         });
-    }
-    
-    private validateUpdate(data: UpdateStoreRequest) {
-        if (!data.id || isNaN(data.id)) throw new ValidationError("ID da loja inválido");
-        if (data.state && data.state.length !== 2) throw new ValidationError("Sigla do estado deve ter 2 caracteres");
     }
 }
 
