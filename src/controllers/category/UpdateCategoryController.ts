@@ -1,22 +1,22 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { UpdateCategoryService } from "../../services/category/UpdateCategoryService";
 
 class UpdateCategoryController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { id } = req.params;
-            const { name } = req.body;
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const id = parseInt(req.params.id, 10);
+        const { name } = req.body;
+        const userId = req.userId;
 
-            const updateCategoryService = new UpdateCategoryService();
-            const updatedCategory = await updateCategoryService.execute({
-                id: parseInt(id, 10),
-                name
-            });
+        const service = new UpdateCategoryService();
+        const updatedCategory = await service.execute({
+            id,
+            name,
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            return res.status(200).json(updatedCategory);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(updatedCategory);
     }
 }
 

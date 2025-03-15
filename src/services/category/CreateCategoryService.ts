@@ -1,61 +1,51 @@
 import prismaClient from "../../prisma";
+import { ValidationError, ConflictError, NotFoundError } from "../../errors";
 
 interface CategoryRequest {
     name: string;
-    storeId: number
+    storeId: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class CreateCategoryService {
-    async execute({ name, storeId }: CategoryRequest) { 
-        try {
-            if (!name || typeof name !== "string" || name.trim() === "") {
-                throw new Error("Invalid category name");
-            }
+    private validateInput(name: string, storeId: number) {
+        if (!name?.trim()) throw new ValidationError("Nome da categoria inválido");
+        if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+    }
 
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+    async execute({ name, storeId, userId, ipAddress, userAgent }: CategoryRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(name, storeId);
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId
-                }
-            })
+            const [store, existingCategory] = await Promise.all([
+                tx.store.findUnique({ where: { id: storeId } }),
+                tx.category.findFirst({ where: { name, storeId, isDeleted: false } })
+            ]);
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-    
-            const categoryAlreadyExists = await prismaClient.category.findFirst({
-                where: {
-                    name: name,
-                    storeId: storeId
-                }
-            })
-    
-            if (categoryAlreadyExists) {
-                throw new Error("Category already exists");
-            }
-    
-            const category = await prismaClient.category.create({
+            if (!store) throw new NotFoundError("Loja não encontrada");
+            if (existingCategory) throw new ConflictError("Categoria já existe");
+
+            const category = await tx.category.create({
+                data: { name, storeId },
+                select: { id: true, name: true, createdAt: true }
+            });
+
+            await tx.auditLog.create({
                 data: {
-                    name: name,
-                    storeId: storeId
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    storeId: true,
-                    createdAt: true
+                    action: "CATEGORY_CREATED",
+                    details: JSON.stringify(category),
+                    userId,
+                    storeId,
+                    ipAddress,
+                    userAgent
                 }
-            })
-    
+            });
+
             return category;
-        } catch (error) {
-            console.log("Failed to create category. Error: ", error);
-            throw new Error(`Failed to create category. Error: ${error.message}`);
-        }
+        });
     }
 }
 
-export { CreateCategoryService }
+export { CreateCategoryService };

@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
 interface DeleteCategoryRequest {
     id: number;
@@ -8,97 +9,62 @@ interface DeleteCategoryRequest {
 }
 
 class DeleteCategoryService {
+    private async softDeleteProducts(products: any[], tx: any) {
+        const productIds = products.map(p => p.id);
+        const movimentIds = products.flatMap(p => p.stockMoviment.map(m => m.id));
+
+        await Promise.all([
+            tx.product.updateMany({
+                where: { id: { in: productIds } },
+                data: { isDeleted: true, deletedAt: new Date() }
+            }),
+            tx.stockMoviment.updateMany({
+                where: { id: { in: movimentIds } },
+                data: { isDeleted: true, deletedAt: new Date() }
+            })
+        ]);
+    }
+
     async execute({ id, userId, ipAddress, userAgent }: DeleteCategoryRequest) {
-        try {
-            if (!id) {
-                throw new Error("Category ID is required");
-            }
+        return await prismaClient.$transaction(async (tx) => {
+            if (!id || isNaN(id)) throw new ValidationError("ID da categoria inválido");
 
-            const categoryExists = await prismaClient.category.findUnique({
-                where: {
-                    id: id,
-                },
-                include: {
-                    products: {
-                        include: {
-                            stockMoviment: true,
-                        },
-                    },
-                },
+            const category = await tx.category.findUnique({
+                where: { id },
+                include: { products: { include: { stockMoviment: true } } }
             });
 
-            if (!categoryExists) {
-                throw new Error("Category not found");
+            if (!category) throw new NotFoundError("Categoria não encontrada");
+            if (category.isDeleted) throw new ConflictError("Categoria já excluída");
+
+            if (category.products.length > 0) {
+                await this.softDeleteProducts(category.products, tx);
             }
 
-            if (categoryExists.products && categoryExists.products.length > 0) {
-                for (const product of categoryExists.products) {
-                    if (product.stockMoviment && product.stockMoviment.length > 0) {
-                        for (const moviment of product.stockMoviment) {
-                            await prismaClient.stockMovimentStore.updateMany({
-                                where: {
-                                    stockMovimentId: moviment.id,
-                                },
-                                data: {
-                                    isDeleted: true,
-                                    deletedAt: new Date(),
-                                },
-                            });
-
-                            await prismaClient.stockMoviment.update({
-                                where: {
-                                    id: moviment.id,
-                                },
-                                data: {
-                                    isDeleted: true,
-                                    deletedAt: new Date(),
-                                },
-                            });
-                        }
-                    }
-
-                    await prismaClient.product.update({
-                        where: {
-                            id: product.id,
-                        },
-                        data: {
-                            isDeleted: true,
-                            deletedAt: new Date(),
-                        },
-                    });
-                }
-            }
-
-            const deletedCategory = await prismaClient.category.update({
-                where: {
-                    id: id,
-                },
-                data: {
-                    isDeleted: true,
-                    deletedAt: new Date(),
-                },
+            const deletedCategory = await tx.category.update({
+                where: { id },
+                data: { isDeleted: true, deletedAt: new Date() }
             });
 
-            await prismaClient.auditLog.create({
+            await tx.auditLog.create({
                 data: {
-                    action: "DELETE_CATEGORY",
+                    action: "CATEGORY_DELETED",
                     details: JSON.stringify({
                         categoryId: id,
-                        deletedAt: new Date(),
-                        relatedProducts: categoryExists.products.map((prod) => prod.id),
+                        deletedProducts: category.products.length
                     }),
-                    userId: userId,
-                    storeId: categoryExists.storeId,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                },
+                    userId,
+                    storeId: category.storeId,
+                    ipAddress,
+                    userAgent
+                }
             });
 
-            return { message: "Category and related products marked as deleted successfully" };
-        } catch (error) {
-            console.error("Error on delete category: ", error);
-            throw new Error(`Failed to delete category. Error: ${error.message}`);
-        }
+            return { 
+                message: "Categoria e produtos marcados para exclusão",
+                deletedAt: deletedCategory.deletedAt
+            };
+        });
     }
 }
 

@@ -1,49 +1,30 @@
 import prismaClient from "../../prisma";
-
-interface CategoryRequest {
-    storeId: number;
-}
+import { ValidationError, NotFoundError } from "../../errors";
 
 class ListCategoryService {
-    async execute({ storeId }: CategoryRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
-            }
+    async execute(storeId: number) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
-            });
+            const store = await tx.store.findUnique({ where: { id: storeId } });
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
-
-            const categories = await prismaClient.category.findMany({
-                where: {
-                    storeId: storeId
-                },
+            const categories = await tx.category.findMany({
+                where: { storeId, isDeleted: false },
                 select: {
                     id: true,
                     name: true,
-                    storeId: true,
-                    createdAt: true
+                    createdAt: true,
+                    _count: { select: { products: { where: { isDeleted: false } } } }
                 },
-                orderBy: {
-                    name: "asc"
-                }
+                orderBy: { name: 'asc' }
             });
-    
-            return {
-                count: categories.length,
-                categories: categories
-            };
-        } catch (error) {
-            console.log("Failed on listing categories: ", error);
-            throw new Error(`Failed on listing categories. Error: ${error}`);
-        }
+
+            return categories.map(cat => ({
+                ...cat,
+                productsCount: cat._count.products
+            }));
+        });
     }
 }
 

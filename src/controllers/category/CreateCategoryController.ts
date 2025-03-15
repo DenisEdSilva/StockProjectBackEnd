@@ -1,19 +1,22 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { CreateCategoryService } from "../../services/category/CreateCategoryService";
 
 class CreateCategoryController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { name, storeId } = req.body;
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const { name } = req.body;
+        const storeId = parseInt(req.params.storeId, 10);
+        const userId = req.userId;
 
-            const createCategoryService = new CreateCategoryService();
+        const service = new CreateCategoryService();
+        const category = await service.execute({
+            name,
+            storeId,
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            const category = await createCategoryService.execute({ name, storeId });
-
-            return res.json(category);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(201).json(category);
     }
 }
 

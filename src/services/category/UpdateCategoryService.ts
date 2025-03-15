@@ -1,51 +1,51 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 
 interface UpdateCategoryRequest {
     id: number;
-    name?: string;
+    name: string;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class UpdateCategoryService {
-    async execute({ id, name }: UpdateCategoryRequest) {
-        try {
-            if (!id) {
-                throw new Error("Category ID is required");
-            }
+    private validateInput(name: string) {
+        if (!name?.trim()) throw new ValidationError("Nome inválido");
+        if (name.length > 50) throw new ValidationError("Nome muito longo (máx. 50 caracteres)");
+    }
 
-            if (!name) {
-                throw new Error("Name is required for update");
-            }
+    async execute({ id, name, userId, ipAddress, userAgent }: UpdateCategoryRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(name);
+            if (!id || isNaN(id)) throw new ValidationError("ID da categoria inválido");
 
-            const categoryExists = await prismaClient.category.findUnique({
-                where: {
-                    id: id
-                }
+            const category = await tx.category.findUnique({ where: { id } });
+            if (!category) throw new NotFoundError("Categoria não encontrada");
+            if (category.isDeleted) throw new ConflictError("Categoria excluída");
+
+            const updatedCategory = await tx.category.update({
+                where: { id },
+                data: { name },
+                select: { id: true, name: true, updatedAt: true }
             });
 
-            if (!categoryExists) {
-                throw new Error("Category not found");
-            }
-
-            const updatedCategory = await prismaClient.category.update({
-                where: {
-                    id: id
-                },
+            await tx.auditLog.create({
                 data: {
-                    name: name
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    createdAt: true,
-                    updatedAt: true
+                    action: "CATEGORY_UPDATED",
+                    details: JSON.stringify({
+                        oldName: category.name,
+                        newName: updatedCategory.name
+                    }),
+                    userId,
+                    storeId: category.storeId,
+                    ipAddress,
+                    userAgent
                 }
             });
 
             return updatedCategory;
-        } catch (error) {
-            console.error("Error on update category: ", error);
-            throw new Error(`Failed to update category. Error: ${error.message}`);
-        }
+        });
     }
 }
 
