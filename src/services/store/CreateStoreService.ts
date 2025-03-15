@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
 interface StoreRequest {
     name: string;
@@ -9,66 +10,49 @@ interface StoreRequest {
 }
 
 class CreateStoreService {
-    async execute({ name, city, state, zipCode, ownerId }: StoreRequest) {
-        try {
-            if (!name || typeof name !== "string" || name.trim() === "") {
-                throw new Error("Invalid store name");
-            }
+    async execute(data: StoreRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateInput(data);
 
-            if (!city || typeof city !== "string" || city.trim() === "") {
-                throw new Error("Invalid city");
-            }
-
-            if (!zipCode || typeof zipCode !== "string" || zipCode.trim() === "") {
-                throw new Error("Invalid zip code");
-            }
-
-            if (!state || typeof state !== "string" || state.trim() === "") {
-                throw new Error("Invalid state");
-            }
-
-            if (!ownerId || isNaN(ownerId)) {
-                throw new Error("Invalid owner ID");
-            }
-
-            const ownerExists = await prismaClient.user.findUnique({
-                where: {
-                    id: ownerId,
-                },
+            const ownerExists = await tx.user.findUnique({
+                where: { id: data.ownerId },
+                select: { id: true }
             });
 
-            if (!ownerExists) {
-                throw new Error("Owner not found");
-            }
+            if (!ownerExists) throw new NotFoundError("Proprietário não encontrado");
 
-            const store = await prismaClient.store.create({
+            const newStore = await tx.store.create({
                 data: {
-                    name: name,
-                    city: city,
-                    state: state,
-                    zipCode: zipCode,
-                    ownerId: ownerId,
-                    userStores: {
-                        create: {
-                            userId: ownerId,
-                        },
-                    },
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    city: true,
-                    state: true,
-                    zipCode: true,
-                    ownerId: true,
+                    name: data.name,
+                    city: data.city,
+                    state: data.state,
+                    zipCode: data.zipCode,
+                    ownerId: data.ownerId
                 },
             });
 
-            return store;
-        } catch (error) {
-            console.error("Error creating store:", error);
-            throw new Error(`Failed to create store. Error: ${error.message}`);
-        }
+            await tx.auditLog.create({
+                data: {
+                    action: "STORE_CREATED",
+                    details: JSON.stringify({
+                        storeId: newStore.id,
+                        ownerId: data.ownerId
+                    }),
+                    userId: data.ownerId,
+                    storeId: newStore.id
+                }
+            });
+
+            return newStore;
+        });
+    }
+
+    private validateInput(data: StoreRequest) {
+        if (!data.name?.trim()) throw new ValidationError("Nome da loja inválido");
+        if (!data.city?.trim()) throw new ValidationError("Cidade inválida");
+        if (!data.state?.trim()) throw new ValidationError("Estado inválido");
+        if (!data.zipCode?.trim()) throw new ValidationError("CEP inválido");
+        if (!data.ownerId || isNaN(data.ownerId)) throw new ValidationError("ID do proprietário inválido");
     }
 }
 

@@ -1,24 +1,20 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { DeleteStoreService } from "../../services/store/DeleteStoreService";
 
 class DeleteStoreController {
-    async handle(req: Request, res: Response) {
-        try {
-            const { storeId } = req.body;
-            const ownerId = req.userId;
+    async handle(req: Request, res: Response, next: NextFunction) {
+        const { id: storeId } = req.params;
+        const ownerId = req.userId;
 
-            const softDeleteStoreService = new DeleteStoreService();
-            const deletedStore = await softDeleteStoreService.execute({
-                storeId,
-                ownerId,
-                ipAddress: req.ip,
-                userAgent: req.headers["user-agent"],
-            });
+        const deleteStoreService = new DeleteStoreService();
+        const result = await deleteStoreService.execute({
+            storeId: parseInt(storeId, 10),
+            ownerId,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"] as string
+        });
 
-            return res.status(200).json(deletedStore);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
+        return res.status(200).json(result);
     }
 }
 

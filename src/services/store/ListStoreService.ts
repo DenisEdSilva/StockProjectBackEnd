@@ -1,44 +1,45 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError } from "../../errors";
 
 interface ListStoreRequest {
     ownerId: number;
 }
 
 class ListStoreService {
-    async execute({ ownerId }: ListStoreRequest) {
-        try {
-            if (!ownerId || isNaN(ownerId)) {
-                throw new Error("Invalid owner ID");
+    async execute(data: ListStoreRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!data.ownerId || isNaN(data.ownerId)) {
+                throw new ValidationError("ID do proprietário inválido");
             }
 
-            const ownerExists = await prismaClient.user.findUnique({
-                where: {
-                    id: ownerId,
-                },
+            const owner = await tx.user.findUnique({
+                where: { id: data.ownerId },
+                select: { id: true }
             });
 
-            if (!ownerExists) {
-                throw new Error("Owner not found");
-            }
+            if (!owner) throw new NotFoundError("Proprietário não encontrado");
 
-            const stores = await prismaClient.store.findMany({
-                where: {
-                    ownerId: ownerId,
+            return await tx.store.findMany({
+                where: { 
+                    ownerId: data.ownerId,
+                    isDeleted: false
                 },
                 select: {
                     id: true,
                     name: true,
                     city: true,
                     state: true,
-                    ownerId: true,
-                },
+                    zipCode: true,
+                    _count: {
+                        select: {
+                            products: true,
+                            categories: true,
+                            storeUsers: true
+                        }
+                    }
+                }
             });
-
-            return stores;
-        } catch (error) {
-            console.error("Error listing stores:", error);
-            throw new Error(`Failed to list stores. Error: ${error.message}`);
-        }
+        });
     }
 }
 

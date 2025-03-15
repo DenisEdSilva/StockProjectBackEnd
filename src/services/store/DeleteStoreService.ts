@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface DeleteStoreRequest {
     storeId: number;
@@ -8,159 +9,65 @@ interface DeleteStoreRequest {
 }
 
 class DeleteStoreService {
-    async execute({ storeId, ownerId, ipAddress, userAgent }: DeleteStoreRequest) {
-        try {
-            if (!storeId || isNaN(storeId)) {
-                throw new Error("Invalid store ID");
+    async execute(data: DeleteStoreRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!data.storeId || isNaN(data.storeId)) {
+                throw new ValidationError("ID da loja inválido");
+            }
+            
+            if (!data.ownerId || isNaN(data.ownerId)) {
+                throw new ValidationError("ID do proprietário inválido");
             }
 
-            if (!ownerId || isNaN(ownerId)) {
-                throw new Error("Invalid owner ID");
-            }
-
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                    ownerId: ownerId,
-                },
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId },
+                select: { ownerId: true }
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found or you do not have permission to delete it");
-            }
+            if (!store) throw new NotFoundError("Loja não encontrada");
+            if (store.ownerId !== data.ownerId) throw new ForbiddenError("Acesso não autorizado");
 
-            const relatedRecords = await this.getRelatedRecords(storeId);
+            await this.softDeleteRelatedRecords(data.storeId, tx);
 
-            await this.deleteRelatedRecords(storeId);
+            const deletedStore = await tx.store.update({
+                where: { id: data.storeId },
+                data: { isDeleted: true, deletedAt: new Date() }
+            });
 
-            const deletedStore = await prismaClient.store.update({
-                where: {
-                    id: storeId,
-                },
+            await tx.auditLog.create({
                 data: {
-                    deletedAt: new Date(),
-                    isDeleted: true,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    city: true,
-                    state: true,
-                    ownerId: true,
-                    deletedAt: true,
-                    isDeleted: true,
-                },
+                    action: "STORE_DELETED",
+                    details: JSON.stringify({ storeId: data.storeId, deletionType: "SOFT_DELETE" }),
+                    userId: data.ownerId,
+                    storeId: data.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
             });
 
-            await this.logDeleteAction({
-                storeId,
-                ownerId,
-                ipAddress,
-                userAgent,
-                relatedRecords,
-            });
-
-            return {
-                message: "Store marked as deleted. You have 30 days to download the audit log backup.",
-                store: deletedStore,
+            return { 
+                message: "Loja marcada para exclusão",
+                deletionDate: deletedStore.deletedAt 
             };
-        } catch (error) {
-            console.error("Error deleting store:", error);
-            throw new Error(`Failed to delete store. Error: ${error.message}`);
-        }
-    }
-
-    private async getRelatedRecords(storeId: number) {
-        const [
-            roles,
-            storeUsers,
-            categories,
-            products,
-            stockMoviments,
-            stockMovimentStores,
-        ] = await Promise.all([
-            prismaClient.role.findMany({ where: { storeId } }),
-            prismaClient.storeUser.findMany({ where: { storeId } }),
-            prismaClient.category.findMany({ where: { storeId } }),
-            prismaClient.product.findMany({ where: { storeId } }),
-            prismaClient.stockMoviment.findMany({ where: { storeId } }),
-            prismaClient.stockMovimentStore.findMany({ where: { storeId } }),
-        ]);
-
-        return {
-            roles,
-            storeUsers,
-            categories,
-            products,
-            stockMoviments,
-            stockMovimentStores,
-        };
-    }
-
-    private async deleteRelatedRecords(storeId: number) {
-        await prismaClient.stockMovimentStore.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
-        });
-
-        await prismaClient.stockMoviment.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
-        });
-
-        await prismaClient.product.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
-        });
-
-        await prismaClient.category.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
-        });
-
-        await prismaClient.storeUser.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
-        });
-
-        await prismaClient.role.updateMany({
-            where: { storeId },
-            data: { deletedAt: new Date(), isDeleted: true },
         });
     }
 
-    private async logDeleteAction({
-        storeId,
-        ownerId,
-        ipAddress,
-        userAgent,
-        relatedRecords,
-    }: {
-        storeId: number;
-        ownerId: number;
-        ipAddress: string;
-        userAgent: string;
-        relatedRecords: any;
-    }) {
-        try {
-            await prismaClient.auditLog.create({
-                data: {
-                    action: "DELETE_STORE",
-                    details: JSON.stringify({
-                        storeId,
-                        relatedRecords,
-                    }),
-                    userId: ownerId,
-                    storeId: storeId,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                    isOwner: true,
-                },
-            });
-        } catch (error) {
-            console.error("Error logging delete action:", error);
-            throw new Error("Failed to log delete action");
-        }
+    private async softDeleteRelatedRecords(storeId: number, tx: any) {
+        const models = [
+            'stockMovimentStore',
+            'stockMoviment',
+            'product',
+            'category',
+            'storeUser',
+            'role'
+        ];
+
+        await Promise.all(models.map(model => 
+            tx[model].updateMany({
+                where: { storeId },
+                data: { isDeleted: true, deletedAt: new Date() }
+            })
+        ));
     }
 }
 

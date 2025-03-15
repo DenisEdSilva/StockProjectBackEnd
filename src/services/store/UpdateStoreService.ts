@@ -1,69 +1,54 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface UpdateStoreRequest {
     id: number;
-    name?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
+    name: string;
+    city: string;
+    state: string;
+    zipCode: string;
     userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateStoreService {
-    async execute({ id, name, city, state, zipCode, userId, ipAddress, userAgent }: UpdateStoreRequest) {
-        try {
-            if (!id) {
-                throw new Error("Store ID is required");
-            }
+    async execute(data: UpdateStoreRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            this.validateUpdate(data);
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: id,
-                },
+            const store = await tx.store.findUnique({
+                where: { id: data.id },
+                select: { ownerId: true }
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
+            if (!store) throw new NotFoundError("Loja não encontrada");
+            if (store.ownerId !== data.userId) throw new ForbiddenError("Acesso não autorizado");
 
-            const updatedStore = await prismaClient.store.update({
-                where: {
-                    id: id,
-                },
+            const updatedStore = await tx.store.update({
+                where: { id: data.id },
+                data: { name: data.name, city: data.city, state: data.state, zipCode: data.zipCode },
+                select: { id: true, name: true, city: true, state: true, zipCode: true }
+            });
+
+            await tx.auditLog.create({
                 data: {
-                    name: name || storeExists.name,
-                    city: city || storeExists.city,
-                    state: state || storeExists.state,
-                    zipCode: zipCode || storeExists.zipCode,
-                },
+                    action: "STORE_UPDATED",
+                    details: JSON.stringify(updatedStore),
+                    userId: data.userId,
+                    storeId: data.id,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
             });
 
-            await prismaClient.auditLog.create({
-                data: {
-                    action: "UPDATE_STORE",
-                    details: JSON.stringify({
-                        storeId: id,
-                        updatedFields: {
-                            name: name || "No changes",
-                            city: city || "No changes",
-                            state: state || "No changes",
-                            zipCode: zipCode || "No changes",
-                        },
-                    }),
-                    userId: userId,
-                    storeId: id,
-                    ipAddress: ipAddress,
-                    userAgent: userAgent,
-                },
-            });
-
-            return { message: "Store updated successfully", store: updatedStore };
-        } catch (error) {
-            console.error("Error updating store:", error);
-            throw new Error(`Failed to update store. Error: ${error.message}`);
-        }
+            return updatedStore;
+        });
+    }
+    
+    private validateUpdate(data: UpdateStoreRequest) {
+        if (!data.id || isNaN(data.id)) throw new ValidationError("ID da loja inválido");
+        if (data.state && data.state.length !== 2) throw new ValidationError("Sigla do estado deve ter 2 caracteres");
     }
 }
 

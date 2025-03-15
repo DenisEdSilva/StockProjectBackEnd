@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../errors";
 
 interface RevertDeleteStoreRequest {
     storeId: number;
@@ -8,93 +9,63 @@ interface RevertDeleteStoreRequest {
 }
 
 class RevertDeleteStoreService {
-    async execute({ storeId, userId, ipAddress, userAgent }: RevertDeleteStoreRequest) {
-        try {
-            if (!storeId) {
-                throw new Error("Store ID is required");
+    private async restoreRelatedRecords(storeId: number, tx: any) {
+        const models = [
+            'stockMovimentStore',
+            'stockMoviment',
+            'product',
+            'category',
+            'storeUser',
+            'role'
+        ];
+
+        await Promise.all(models.map(model => 
+            tx[model].updateMany({
+                where: { storeId },
+                data: { isDeleted: false, deletedAt: null }
+            })
+        ));
+    }
+
+    async execute(data: RevertDeleteStoreRequest) {
+        return await prismaClient.$transaction(async (tx) => {
+            if (!data.storeId || isNaN(data.storeId)) {
+                throw new ValidationError("ID da loja inválido");
+            }
+            
+            if (!data.userId || isNaN(data.userId)) {
+                throw new ValidationError("ID do usuário inválido");
             }
 
-            const storeExists = await prismaClient.store.findUnique({
-                where: {
-                    id: storeId,
-                },
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId },
+                select: { ownerId: true, isDeleted: true }
             });
 
-            if (!storeExists) {
-                throw new Error("Store not found");
-            }
+            if (!store) throw new NotFoundError("Loja não encontrada");
+            if (!store.isDeleted) throw new ConflictError("Loja não está marcada para exclusão");
+            if (store.ownerId !== data.userId) throw new ForbiddenError("Acesso não autorizado");
 
-            if (!storeExists.isDeleted) {
-                throw new Error("Store is not marked as deleted");
-            }
+            await this.restoreRelatedRecords(data.storeId, tx);
 
-            const revertedStore = await prismaClient.$transaction(async (prisma) => {
-
-                const revertedStore = await prisma.store.update({
-                    where: {
-                        id: storeId,
-                    },
-                    data: {
-                        isDeleted: false,
-                        deletedAt: null,
-                    },
-                });
-
-                await prisma.stockMovimentStore.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.stockMoviment.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.product.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.category.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.storeUser.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.role.updateMany({
-                    where: { storeId: storeId },
-                    data: { isDeleted: false, deletedAt: null },
-                });
-
-                await prisma.auditLog.create({
-                    data: {
-                        action: "REVERT_DELETE_STORE",
-                        details: JSON.stringify({
-                            storeId: storeId,
-                            revertedAt: new Date(),
-                        }),
-                        userId: userId,
-                        storeId: storeId,
-                        ipAddress: ipAddress,
-                        userAgent: userAgent,
-                    },
-                });
-
-                return revertedStore;
+            const restoredStore = await tx.store.update({
+                where: { id: data.storeId },
+                data: { isDeleted: false, deletedAt: null }
             });
 
-            return {
-                message: "Store and related data reverted successfully",
-                store: revertedStore,
-            };
-        } catch (error) {
-            console.error("Error reverting delete store: ", error);
-            throw new Error(`Failed to revert delete store. Error: ${error.message}`);
-        }
+            await tx.auditLog.create({
+                data: {
+                    action: "STORE_RESTORED",
+                    details: JSON.stringify({ storeId: data.storeId }),
+                    userId: data.userId,
+                    storeId: data.storeId,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                }
+            });
+
+            return restoredStore;
+        });
     }
 }
 
