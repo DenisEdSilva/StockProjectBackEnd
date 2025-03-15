@@ -3,20 +3,24 @@ import { CreateCategoryService } from "../../services/category/CreateCategorySer
 
 class CreateCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
-        const { name } = req.body;
-        const storeId = parseInt(req.params.storeId, 10);
-        const userId = req.userId;
-
-        const service = new CreateCategoryService();
-        const category = await service.execute({
-            name,
-            storeId,
-            userId,
-            ipAddress: req.ip,
-            userAgent: req.headers["user-agent"] as string
-        });
-
-        return res.status(201).json(category);
+        try {
+            const { name } = req.body;
+            const storeId = parseInt(req.params.storeId, 10);
+            const userId = req.userId;
+    
+            const service = new CreateCategoryService();
+            const category = await service.execute({
+                name,
+                storeId,
+                userId,
+                ipAddress: req.ip,
+                userAgent: req.headers["user-agent"] as string
+            });
+    
+            return res.status(201).json(category);
+        } catch (error) {
+            next(error);    
+        }
     }
 }
 

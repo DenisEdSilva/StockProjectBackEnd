@@ -1,8 +1,8 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { CreateStoreUserService } from "../../services/storeUser/CreateStoreUserService";
 
 class CreateStoreUserController {
-    async handle(req: Request, res: Response) {
+    async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { userId, name, email, password, roleId, storeId } = req.body;
 
@@ -18,7 +18,7 @@ class CreateStoreUserController {
 
             return res.status(201).json(storeUser);
         } catch (error) {
-            return res.status(400).json({ error: error.message });
+            next(error);
         }
     }
 }

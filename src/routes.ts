@@ -9,31 +9,43 @@ interface RequestWithToken extends Request {
 import { CreatePermissionController } from "./controllers/permission/CreatePermissionController";
 
 // USER CONTROLLERS
-import { CreateUserController } from "./controllers/user/CreateUserController"
-import { AuthUserController } from "./controllers/user/AuthUserController"
-import { DetailUserController } from "./controllers/user/DetailUserController"
+import { CreateUserController } from "./controllers/user/CreateUserController";
+import { DetailUserController } from "./controllers/user/DetailUserController";
 import { UpdateUserController } from "./controllers/user/UpdateUserController";
+import { DeleteUserController } from "./controllers/user/DeleteUserController";
+import { AuthUserController } from "./controllers/user/AuthUserController";
 
 // STORE CONTROLLERS
 import { CreateStoreController } from "./controllers/store/CreateStoreController";
 import { ListStoreController } from "./controllers/store/ListStoreController";
+import { UpdateStoreController } from "./controllers/store/UpdateStoreController";
+import { DeleteStoreController } from "./controllers/store/DeleteStoreController";
+import { RevertDeleteStoreController } from "./controllers/store/RevertDeleteStoreController";
 
 // ROLE CONTROLLERS
 import { CreateRoleController } from "./controllers/role/CreateRoleController";
+import { ListRoleController } from "./controllers/role/ListRoleController";
+import { UpdateRoleController } from "./controllers/role/UpdateRoleController";
+import { DeleteRoleController } from "./controllers/role/DeleteRoleController";
 
 // STORE USERS CONTROLLERS
 import { CreateStoreUserController } from "./controllers/storeUser/CreateStoreUserController";
 import { ListStoreUserController } from "./controllers/storeUser/ListStoreUserController";
 import { UpdateStoreUserController } from "./controllers/storeUser/UpdateStoreUserController";
 import { AuthStoreUserController } from "./controllers/storeUser/AuthStoreUserController";
+import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUserController";
 
 // CATEGORY CONTROLLERS
 import { CreateCategoryController } from "./controllers/category/CreateCategoryController";
 import { ListCategoryController } from "./controllers/category/ListCategoryController";
+import { UpdateCategoryController } from "./controllers/category/UpdateCategoryController";
+import { DeleteCategoryController } from "./controllers/category/DeleteCategoryController";
 
 // PRODUCT CONTROLLERS
 import { CreateProductController } from "./controllers/products/CreateProductController";
 import { ListProductController } from "./controllers/products/ListProductController";
+import { UpdateProductController } from "./controllers/products/UpdateProductController";
+import { DeleteProductController } from "./controllers/products/DeleteProductController";
 
 // STOCK CONTROLLERS
 import { CreateStockController } from "./controllers/stock/CreateStockController";
@@ -41,22 +53,8 @@ import { ListMovimentStockController } from "./controllers/stock/ListMovimentSto
 import { RevertStockController } from "./controllers/stock/RevertStockController";
 
 // MIDDLEWARES
-import { authenticated } from "./middlewares/authenticated"
-import { authorized } from "./middlewares/authorized"
-
-import { UpdateRoleController } from "./controllers/role/UpdateRoleController";
-import { UpdateProductController } from "./controllers/products/UpdateProductController";
-import { DeleteProductController } from "./controllers/products/DeleteProductController";
-import { UpdateCategoryController } from "./controllers/category/UpdateCategoryController";
-import { DeleteCategoryController } from "./controllers/category/DeleteCategoryController";
-import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUserController";
-import { ListRoleController } from "./controllers/role/ListRoleController";
-import { DeleteRoleController } from "./controllers/role/DeleteRoleController";
-import { UpdateStoreController } from "./controllers/store/UpdateStoreController";
-import { DeleteStoreController } from "./controllers/store/DeleteStoreController";
-import { RevertDeleteStoreController } from "./controllers/store/RevertDeleteStoreController";
-
-
+import { authenticated } from "./middlewares/authenticated";
+import { authorized } from "./middlewares/authorized";
 
 const router = Router();
 
@@ -69,9 +67,9 @@ router.post("/permission", async (req: Request, res: Response): Promise<void> =>
 // USER ROUTES
 
 // criando um usuário (owner)
-router.post("/users", async (req: Request, res: Response): Promise<void> => {
+router.post("/users", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const createUserController = new CreateUserController();
-    await createUserController.handle(req, res);
+    await createUserController.handle(req, res, next);
 });
 
 // autenticando um usuário
@@ -90,6 +88,12 @@ router.put("/me", authenticated, async (req: Request, res: Response): Promise<vo
 router.get("/me", authenticated, authorized("ONLY", "OWNER"), async (req: Request, res: Response): Promise<void> => {
     const detailUserController = new DetailUserController();
     await detailUserController.handle(req, res);
+})
+
+// deletando um usuário
+router.delete("/me/delete", authenticated, authorized("ONLY", "OWNER"), async (req: Request, res: Response): Promise<void> => {
+    const deleteUserController = new DeleteUserController();
+    await deleteUserController.handle(req, res);
 })
 
 // STORE ROUTES
