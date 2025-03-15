@@ -24,6 +24,7 @@ class DetailUserService {
             },
         });
 
+
         if (!user) {
             throw new NotFoundError("Usuário não encontrado");
         }

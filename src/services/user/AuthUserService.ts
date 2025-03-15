@@ -63,9 +63,16 @@ class AuthUserService {
         });
 
         const token = sign(
-            { id: user.id, name: user.name, email: user.email, isOwner: user.isOwner },
+            { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email, 
+                isOwner: user.isOwner 
+            },
             process.env.JWT_SECRET!,
-            { expiresIn: "30d" }
+            { 
+                expiresIn: "30d" 
+            }
         );
 
         await redisClient.set(`user:${user.id}`, JSON.stringify({
@@ -75,6 +82,17 @@ class AuthUserService {
             isOwner: user.isOwner,
             permissions: []
         }));
+
+        await Promise.all([
+            prismaClient.user.update({
+                where: { 
+                    id: user.id 
+                },
+                data: { 
+                    lastActivityAt: new Date() 
+                }
+            })
+        ])       
 
         await prismaClient.auditLog.create({
             data: {

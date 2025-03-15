@@ -100,7 +100,7 @@ router.put("/me",
   }
 );
 
-router.delete("/me",
+router.delete("/me/:id",
   authenticated,
   authorized("DELETE", "USER"),
   (req: Request, res: Response, next: NextFunction) => {

@@ -30,7 +30,7 @@ class DeleteUserService {
                 throw new NotFoundError("Usuário não encontrado");
             }
 
-            if (user.isOwner) {
+            if (!user.isOwner) {
                 throw new ForbiddenError("Usuários proprietários requerem um processo de exclusão especial");
             }
 
@@ -50,7 +50,16 @@ class DeleteUserService {
                 data: { markedForDeletionAt: deletionDate }
             });
 
-            await tx.store.deleteMany({ where: { ownerId: id } });
+            await Promise.all([
+                prismaClient.user.update({
+                    where: { 
+                        id: user.id 
+                    },
+                    data: { 
+                        lastActivityAt: new Date() 
+                    }
+                })
+            ])   
 
             await tx.auditLog.create({
                 data: {

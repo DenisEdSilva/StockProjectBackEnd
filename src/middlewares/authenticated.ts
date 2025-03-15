@@ -26,7 +26,8 @@ export function authenticated(req: Request, res: Response, next: NextFunction): 
 
         const decoded = verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
-        const userId = parseInt(decoded.sub, 10);
+        const userId = decoded.id;
+
         if (isNaN(userId)) {
             throw new ValidationError("ID de usuário inválido no token");
         }

@@ -57,6 +57,17 @@ class UpdateUserService {
                 select: { id: true, name: true, email: true }
             });
 
+            await Promise.all([
+                prismaClient.user.update({
+                    where: { 
+                        id: userId 
+                    },
+                    data: { 
+                        lastActivityAt: new Date() 
+                    }
+                })
+            ])   
+
             await tx.auditLog.create({
                 data: {
                     action: "USER_UPDATED",
