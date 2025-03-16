@@ -40,7 +40,7 @@ model Store {
   lastActivityAt DateTime?
 
   owner    User   @relation("StoreOwner", fields: [ownerId], references: [id])
-  storeUsers      StoreUser[]
+  storeUsers StoreUser[] @relation("StoreUserStoreRelation")
   categories      Category[]
   products        Product[]
   StockMoviment   StockMoviment[]
@@ -61,11 +61,11 @@ model StoreUser {
   createdBy Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  deletedBy Int
+  deletedBy Int?
   deletedAt DateTime?
   isDeleted Boolean  @default(false)
 
-  store    Store    @relation(fields: [storeId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id], name: "StoreUserStoreRelation")
   role      Role     @relation(fields: [roleId], references: [id])
   AuditLog AuditLog[]
 }

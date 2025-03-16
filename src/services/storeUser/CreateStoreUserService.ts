@@ -1,5 +1,4 @@
 import prismaClient from "../../prisma";
-import { Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { 
     ValidationError, 
@@ -21,6 +20,12 @@ class CreateStoreUserService {
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
+            const storeExists = await tx.store.findUnique({
+                where: { id: data.storeId }
+            });
+
+            if (!storeExists) throw new NotFoundError("Loja não encontrada");
+
             const [emailExists, roleExists] = await Promise.all([
                 tx.storeUser.findUnique({ where: { email: data.email }}),
                 tx.role.findUnique({ where: { id: data.roleId }})
@@ -33,9 +38,13 @@ class CreateStoreUserService {
 
             return await tx.storeUser.create({
                 data: {
-                    ...data,
-                    password: passwordHash
-                } as Prisma.StoreUserUncheckedCreateInput,
+                    name: data.name,
+                    email: data.email,
+                    password: passwordHash,
+                    roleId: data.roleId,
+                    storeId: data.storeId,
+                    createdBy: data.createdBy
+                },
                 select: {
                     id: true,
                     name: true,

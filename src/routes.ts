@@ -181,7 +181,7 @@ router.delete("/roles/:id",
 );
 
 // STORE USER ROUTES
-router.post("/store/users",
+router.post("/store/:storeId/users",
   authenticated,
   authorized("POST", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
