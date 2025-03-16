@@ -4,12 +4,14 @@ import { UpdateRoleService } from "../../services/role/UpdateRoleService";
 class UpdateRoleController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id: roleId } = req.params;
+            const roleId = parseInt(req.params.roleId, 10);
+
             const { name, permissionIds } = req.body;
+            console.log(roleId ,name, permissionIds);
     
             const updateRoleService = new UpdateRoleService();
             const role = await updateRoleService.execute({ 
-                roleId: parseInt(roleId, 10), 
+                roleId: roleId, 
                 name, 
                 permissionIds 
             });

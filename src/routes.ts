@@ -64,8 +64,6 @@ const router = Router();
 
 // PERMISSION ROUTES
 router.post("/permissions",
-  authenticated,
-  authorized("POST", "PERMISSION"),
   (req: Request, res: Response) => {
     new CreatePermissionController().handle(req, res,);
   }
@@ -150,7 +148,7 @@ router.post("/stores/:id/revert",
 );
 
 // ROLE ROUTES
-router.post("/roles",
+router.post("/roles/:storeId",
   authenticated,
   authorized("POST", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -158,7 +156,7 @@ router.post("/roles",
   }
 );
 
-router.get("/roles",
+router.get("/roles/:storeId",
   authenticated,
   authorized("GET", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -166,7 +164,7 @@ router.get("/roles",
   }
 );
 
-router.put("/roles/:id",
+router.put("/roles/:roleId",
   authenticated,
   authorized("PUT", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {

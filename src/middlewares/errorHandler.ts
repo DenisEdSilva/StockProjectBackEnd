@@ -22,5 +22,5 @@ export const errorHandler: ErrorRequestHandler = (
         return;
     }
 
-    res.status(500).json({ error: "Erro interno do servidor" });
+    res.status(500).json({ error: "Erro interno do servidor", message: error.message });
 };
