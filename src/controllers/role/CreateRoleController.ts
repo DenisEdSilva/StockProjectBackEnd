@@ -7,9 +7,17 @@ class CreateRoleController {
             const { name, permissionIds } = req.body;
             const storeId = parseInt(req.params.storeId, 10);
             const userId = req.userId;
+            const performedByUserId = req.userId;
             
             const createRoleService = new CreateRoleService();
-            const role = await createRoleService.execute({ name, storeId, permissionIds });
+            const role = await createRoleService.execute({ 
+                performedByUserId,
+                name, 
+                storeId, 
+                permissionIds,
+                ipAddress: req.ip,
+                userAgent: req.headers["user-agent"] as string
+             });
             
             return res.status(201).json(role);
         } catch (error) {

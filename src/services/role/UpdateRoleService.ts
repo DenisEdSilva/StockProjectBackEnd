@@ -1,16 +1,19 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateRoleRequest {
+    performedByUserId: number;
     roleId: number;
     name: string;
     permissionIds: number[];
+    ipAddress: string;
+    userAgent: string;
 }
 
 class UpdateRoleService {
-    async execute({ roleId, name, permissionIds }: UpdateRoleRequest) {
-
-        console.log( roleId, name, permissionIds );
+    async execute({ performedByUserId, roleId, name, permissionIds, ipAddress, userAgent }: UpdateRoleRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
             if (!name?.trim()) throw new ValidationError("Nome inválido");
@@ -74,6 +77,19 @@ class UpdateRoleService {
                 });
             }
 
+            await auditLogService.create({
+                action: "ROLE_UPDATE",
+                details: {
+                    roleId,
+                    name,
+                    permissionIds
+                },
+                userId: performedByUserId,
+                storeId: role.storeId,
+                ipAddress: ipAddress,
+                userAgent: userAgent
+            })
+
             return await tx.role.findUnique({
                 where: { 
                     id: roleId 
@@ -86,6 +102,10 @@ class UpdateRoleService {
                     } 
                 }
             });
+
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 }

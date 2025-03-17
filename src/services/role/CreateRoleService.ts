@@ -1,14 +1,19 @@
 import prismaClient from "../../prisma";
 import { ValidationError, ConflictError, NotFoundError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface CreateRoleRequest {
+    performedByUserId: number;
     name: string;
     storeId: number;
     permissionIds: number[];
+    ipAddress: string;
+    userAgent: string;
 }
 
 class CreateRoleService {
-    async execute({ name, storeId, permissionIds }: CreateRoleRequest) {
+    async execute({ performedByUserId, name, storeId, permissionIds, ipAddress, userAgent }: CreateRoleRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             if (!name?.trim()) throw new ValidationError("Nome do perfil inválido");
             if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
@@ -37,6 +42,21 @@ class CreateRoleService {
                     permissionId
                 }))
             });
+
+            await auditLogService.create({
+                action: "ROLE_CREATE",
+                details: {
+                    roleId: newRole.id,
+                    roleName: name,
+                    storeId: storeId,
+                    permissionIds
+                },
+                storeId: storeId,
+                userId: performedByUserId,
+                ipAddress:  ipAddress,
+                userAgent: userAgent
+            })
+
 
             return await tx.role.findUnique({
                 where: { id: newRole.id },
