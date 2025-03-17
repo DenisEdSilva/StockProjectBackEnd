@@ -4,16 +4,31 @@ import { ValidationError, ConflictError, NotFoundError } from "../../errors";
 
 interface UserRequest {
     userId: number;
+    performedByUserId: number;
     name?: string;
     email?: string;
     password?: string;
     ipAddress: string;
     userAgent: string;
 }
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 class UpdateUserService {
-    async execute({ userId, name, email, password, ipAddress, userAgent }: UserRequest) {
+    async execute({ userId, performedByUserId, name, email, password, ipAddress, userAgent }: UserRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
+            if (performedByUserId !== userId) {
+                throw new ValidationError("Apenas o próprio usuário pode atualizar seus dados");
+            }
+
+            const executor = await tx.user.findUnique({
+                where: { id: performedByUserId },
+                select: { isOwner: true }
+            });
+
+            if (!executor?.isOwner) {
+                throw new ConflictError("Apenas owners podem atualizar dados");
+            }
             if (!userId || isNaN(userId)) {
                 throw new ValidationError("ID de usuário inválido");
             }
@@ -57,33 +72,32 @@ class UpdateUserService {
                 select: { id: true, name: true, email: true }
             });
 
-            await Promise.all([
-                prismaClient.user.update({
-                    where: { 
-                        id: userId 
-                    },
-                    data: { 
-                        lastActivityAt: new Date() 
-                    }
-                })
-            ])   
-
-            await tx.auditLog.create({
-                data: {
-                    action: "USER_UPDATED",
-                    details: JSON.stringify({
-                        changedFields: Object.keys(updateData),
-                        oldEmail: userExists.email,
-                        newEmail: email || userExists.email
-                    }),
-                    userId: updatedUser.id,
-                    ipAddress,
-                    userAgent,
-                    isOwner: true
+            tx.user.update({
+                where: { 
+                    id: userId 
+                },
+                data: { 
+                    lastActivityAt: new Date() 
                 }
+            })
+
+            await auditLogService.create({
+                action: "USER_UPDATED",
+                details: {
+                    changedFields: Object.keys(updateData),
+                    oldEmail: userExists.email,
+                    newEmail: email || userExists.email
+                },  
+                userId: performedByUserId,
+                ipAddress,
+                userAgent,
+                isOwnerOverride: true
             });
 
             return updatedUser;
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 

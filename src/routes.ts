@@ -90,7 +90,7 @@ router.get("/me",
   }
 );
 
-router.put("/me",
+router.put("/me/:userId",
   authenticated,
   authorized("PUT", "USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -195,7 +195,7 @@ router.post("/store/sessions",
   }
 );
 
-router.get("/store/users",
+router.get("/store/:storeId/users",
   authenticated,
   authorized("GET", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {

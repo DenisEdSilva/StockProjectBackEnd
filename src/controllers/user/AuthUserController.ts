@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthUserService } from "../../services/user/AuthUserService";
+import { redisClient } from "../../redis.config";
 
 class AuthUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
@@ -13,6 +14,12 @@ class AuthUserController {
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });
+
+            await redisClient.setEx(
+                `user:${auth.id}`,
+                28800,
+                JSON.stringify(auth)
+            )
 
             return res.status(200).json(auth);
         } catch (error) {

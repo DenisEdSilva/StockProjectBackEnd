@@ -15,9 +15,11 @@ interface AuthRequest {
     ipAddress: string;
     userAgent: string;
 }
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 class AuthUserService {
     async execute({ email, password, ipAddress, userAgent }: AuthRequest) {
+        const auditLogService = new CreateAuditLogService();
         if (!this.isValidEmail(email)) {
             throw new ValidationError("Formato de email inválido");
         }
@@ -94,20 +96,26 @@ class AuthUserService {
             })
         ])       
 
-        await prismaClient.auditLog.create({
-            data: {
-                action: "USER_LOGIN",
-                details: JSON.stringify({ method: "email/password", device: userAgent }),
+        await auditLogService.create({
+            action: "USER_LOGIN",
+            details: { 
                 userId: user.id,
-                ipAddress,
-                userAgent,
+                name: user.name,
+                email: user.email,
                 isOwner: user.isOwner
-            }
+            },
+            ...(user.isOwner 
+                ? { userId: user.id } 
+                : { storeUserId: user.id }
+            ),
+            ipAddress,
+            userAgent,
+            isOwnerOverride: user.isOwner
         });
 
         return { 
-            ...user,
             token,
+            ...user,
             stores: user.ownedStores
         };
     }
