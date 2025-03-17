@@ -6,14 +6,18 @@ class CreateStoreController {
         try {
             const { name, city, state, zipCode } = req.body;
             const ownerId = req.userId;
+            const performedByUserId = req.userId;
     
             const createStoreService = new CreateStoreService();
             const store = await createStoreService.execute({
+                performedByUserId,
                 name,
                 city,
                 state,
                 zipCode,
-                ownerId
+                ownerId,
+                ipAddress: req.ip,
+                userAgent: req.headers["user-agent"] as string
             });
     
             return res.status(201).json(store);

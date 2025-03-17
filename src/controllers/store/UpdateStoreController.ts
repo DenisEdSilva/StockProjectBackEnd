@@ -7,10 +7,12 @@ class UpdateStoreController {
             const { id } = req.params;
             const { name, city, state, zipCode } = req.body;
             const userId = req.userId;
+            const performedByUserId = req.userId;
     
             const updateStoreService = new UpdateStoreService();
             const result = await updateStoreService.execute({
                 id: parseInt(id, 10),
+                performedByUserId,
                 name,
                 city,
                 state,

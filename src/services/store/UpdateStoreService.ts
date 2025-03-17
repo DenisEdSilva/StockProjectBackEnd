@@ -1,8 +1,10 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateStoreRequest {
     id: number;
+    performedByUserId: number;
     userId: number;
     ipAddress: string;
     userAgent: string;
@@ -14,6 +16,7 @@ interface UpdateStoreRequest {
 
 class UpdateStoreService {
     async execute(data: UpdateStoreRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             if (!data.id || isNaN(data.id)) throw new ValidationError("ID da loja inválido");
 
@@ -65,18 +68,16 @@ class UpdateStoreService {
                 })
             ]);
 
-            await tx.auditLog.create({
-                data: {
-                    action: "STORE_UPDATED",
-                    details: JSON.stringify({
-                        from: store,
-                        to: updatedStore
-                    }),
-                    userId: data.userId,
-                    storeId: data.id,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                }
+            await auditLogService.create({
+                action: "STORE_UPDATE",
+                details: {
+                    from: store,
+                    to: updatedStore
+                },
+                userId: data.performedByUserId,
+                storeId: data.id,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return updatedStore;

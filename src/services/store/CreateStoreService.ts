@@ -1,16 +1,21 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface StoreRequest {
+    performedByUserId: number;
     name: string;
     city: string;
     state: string;
     zipCode: string;
     ownerId: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class CreateStoreService {
     async execute(data: StoreRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -31,19 +36,29 @@ class CreateStoreService {
                 },
             });
 
-            await tx.auditLog.create({
-                data: {
-                    action: "STORE_CREATED",
-                    details: JSON.stringify({
+            await auditLogService.create(
+                {
+                    action: "STORE_CREATE",
+                    details: {
                         storeId: newStore.id,
-                        ownerId: data.ownerId
-                    }),
-                    userId: data.ownerId,
-                    storeId: newStore.id
-                }
-            });
+                        ownerId: data.ownerId,
+                        storeName: data.name,
+                        storeCity: data.city,
+                        storeState: data.state,
+                        storeZipCode: data.zipCode
+                    },
+                    userId: data.performedByUserId,
+                    storeId: newStore.id,
+                    ipAddress: data.ipAddress,
+                    userAgent: data.userAgent
+                },
+                tx
+            );
 
             return newStore;
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 
