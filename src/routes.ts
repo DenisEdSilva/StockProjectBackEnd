@@ -219,14 +219,6 @@ router.delete("/stores/:storeId/users/:storeUserId",
   }
 );
 
-router.post("/stores/:storeId/users/:id/acl",
-  authenticated,
-  authorized("POST", "STORE_USER_ACL"),
-  (req: Request, res: Response, next: NextFunction) => {
-    new CreateStoreUserAccessControlListController().handle(req, res, next);
-  }
-);
-
 // CATEGORY ROUTES
 router.post("/stores/:storeId/categories",
   authenticated,

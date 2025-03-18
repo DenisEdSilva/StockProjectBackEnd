@@ -5,8 +5,10 @@ import {
     ConflictError, 
     NotFoundError 
 } from "../../errors";
+import { CreateStoreUserAccessControlListService } from "./CreateStoreUserAccessControlListService";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
+import { redisClient } from "../../redis.config";
 
 interface StoreUserRequest {
     performedByUserId: number;
@@ -25,6 +27,7 @@ class CreateStoreUserService {
     async execute(data: StoreUserRequest) {
         const auditLogService = new CreateAuditLogService();
         const activityTracker = new ActivityTracker();
+        const aclService = new CreateStoreUserAccessControlListService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -60,6 +63,15 @@ class CreateStoreUserService {
                     roleId: true
                 }
             });
+
+            const acl = await aclService.execute({ storeUserId: user.id });
+
+            await redisClient.setEx(
+                `acl:${user.id}`,
+                28800,
+                JSON.stringify(acl)
+            );
+    
 
             await activityTracker.track({
                 tx,

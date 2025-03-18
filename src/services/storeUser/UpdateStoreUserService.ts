@@ -6,8 +6,10 @@ import {
     ConflictError, 
     UnauthorizedError
 } from "../../errors";
+import { CreateStoreUserAccessControlListService } from "./CreateStoreUserAccessControlListService";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
+import { redisClient } from "../../redis.config";
 
 interface UpdateRequest {
     performedByUserId: number;
@@ -24,6 +26,7 @@ interface UpdateRequest {
 
 class UpdateStoreUserService {
     async execute(data: UpdateRequest) {
+        const aclService = new CreateStoreUserAccessControlListService();
         const auditLogService = new CreateAuditLogService();
         const activityTracker = new ActivityTracker
         return await prismaClient.$transaction(async (tx) => {
@@ -93,6 +96,14 @@ class UpdateStoreUserService {
                     updatedAt: true
                 }
             });
+
+            const acl = await aclService.execute({ storeUserId: data.id });
+
+            await redisClient.setEx(
+                `acl:${data.id}`,
+                28800,
+                JSON.stringify(acl)
+            );
 
             await activityTracker.track({
                 tx,
