@@ -15,7 +15,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
   - [Usuarios](#usuarios)
   - [Lojas](#lojas)
   - [Roles](#roles)
-  - [StoreUsers](#funcionarios-storeusers)
+  - [StoreUsers](#store-users)
   - [Categorias](#categorias)
   - [Produtos](#produtos)
   - [Estoque](#estoque)
@@ -33,7 +33,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-### 🌟 Funcionalidades Principais
+### 🌟 Funcionalidades-Principais
 - Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers)  
 - Controle de permissões baseado em roles  
 - Auditoria detalhada de todas as ações críticas  
@@ -60,7 +60,7 @@ npm run dev
 ```
 ---
 
-### 🔧 Variaveis de Ambiente
+### 🔧 Variaveis-de-Ambiente
 
 Crie um arquivo .env na raiz do projeto:
 ```bash
@@ -87,7 +87,7 @@ DELETION_GRACE_PERIOD = 30
 - **Header**: Authorization: Bearer <JWT_TOKEN>
 - **Middleware**: authorized para permissões
 
-### 📚 Documentaçao das Rotas
+### 📚 Documentaçao-das-Rotas
 #### Usuarios
 
 | Método	|   Endpoint  | Descrição                         |   Permissão   |
@@ -117,7 +117,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/roles/:roleId | Atualiza a role | PUT:ROLE |
 | DELETE | /stores/:storeId/roles/:roleId | Delete a role | DELETE:ROLE |
 
-#### StoreUsers
+#### Store-Users
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -159,7 +159,7 @@ DELETION_GRACE_PERIOD = 30
 |-----------|----------|-----------|-----------|
 | GET |	/audit-logs | Lista logs de auditoria | GET:AUDIT_LOG |
 
-### 🚨 Tratamento de Erros
+### 🚨 Tratamento-de-Erros
 ```bash
 {
   "error": "Tipo do erro",
