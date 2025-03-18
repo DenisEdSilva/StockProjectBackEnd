@@ -62,7 +62,7 @@ npm run dev
 ```
 ---
 
-## 🔧 Variáveis de Ambiente {#variaveis-de-ambiente}
+## 🔧 Variáveis de Ambiente
 ```bash
 Crie um arquivo .env na raiz do projeto:
 DATABASE_URL="postgresql://postgres:admin@localhost:5432/StockProject?schema=public"
@@ -84,22 +84,22 @@ DELETION_GRACE_PERIOD = 30
 
 ```
 
-## 🔑 Autenticação {#autenticacao}
+## 🔑 Autenticação
 Header: Authorization: Bearer <JWT_TOKEN>
 Middleware: authorized para permissões
 
-## 📚 Documentação das Rotas {#documentacao-das-rotas}
-## Usuários {#usuarios}
+## 📚 Documentação das Rotas
+## Usuários
 ```bash
 Método	Endpoint	Descrição
 POST	/users	Cria usuário owner
-Lojas {#lojas}
+```
+## Lojas
+```bash
 Método	Endpoint	Descrição
 POST	/stores	Cria loja
-
-
 ```
-## 🚨 Tratamento de Erros {#tratamento-de-erros}
+## 🚨 Tratamento de Erros
 ```bash
 {
   "error": "Tipo do erro",
