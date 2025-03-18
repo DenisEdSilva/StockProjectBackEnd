@@ -144,7 +144,7 @@ DELETION_GRACE_PERIOD = 30
 | POST	  | /stores/:storeId/categories/:categoryId/products	 | Cria produto | PUT:PRODUCT |
 | GET | /stores/:storeId/categories/:categoryId/products | Lista produtos	| GET:PRODUCT |
 | PUT | /stores/:storeId/categories/:categoryId/products/:productId	| Atualiza produto | PUT:PRODUCT |
-| DELETE | /stores/:storeId/categories/:categoryId/products/:productId | DELETE:PRODUCT |
+| DELETE | /stores/:storeId/categories/:categoryId/products/:productId | Exclui produto	 | DELETE:PRODUCT |
 
 ## Estoque
 
