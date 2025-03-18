@@ -18,7 +18,10 @@ class AuthUserController {
             await redisClient.setEx(
                 `user:${auth.id}`,
                 28800,
-                JSON.stringify(auth)
+                JSON.stringify({
+                    ...auth,
+                    isOwner: true
+                })
             )
 
             return res.status(200).json(auth);

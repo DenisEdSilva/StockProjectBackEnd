@@ -104,10 +104,7 @@ class AuthUserService {
                 email: user.email,
                 isOwner: user.isOwner
             },
-            ...(user.isOwner 
-                ? { userId: user.id } 
-                : { storeUserId: user.id }
-            ),
+            userId: user.id,
             ipAddress,
             userAgent,
             isOwnerOverride: user.isOwner
