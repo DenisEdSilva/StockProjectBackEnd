@@ -24,7 +24,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 🛠 Tecnologias {#tecnologias}
+### 🛠 Tecnologias {#tecnologias}
 - **Node.js** & **Express**  
 - **Prisma** (PostgreSQL)  
 - **JWT** (Autenticação)  
@@ -33,7 +33,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 🌟 Funcionalidades Principais {#funcionalidades-principais}
+### 🌟 Funcionalidades Principais {#funcionalidades-principais}
 - Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers)  
 - Controle de permissões baseado em roles  
 - Auditoria detalhada de todas as ações críticas  
@@ -42,7 +42,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 📦 Instalação {#instalacao}
+### 📦 Instalação {#instalacao}
 ```bash
 # Clone o repositório
 git clone https://github.com/DenisEdSilva/StockProject.git
@@ -60,7 +60,7 @@ npm run dev
 ```
 ---
 
-## 🔧 Variáveis de Ambiente {#variaveis-de-ambiente}
+### 🔧 Variáveis de Ambiente {#variaveis-de-ambiente}
 
 Crie um arquivo .env na raiz do projeto:
 ```bash
@@ -83,12 +83,12 @@ DELETION_GRACE_PERIOD = 30
 
 ```
 
-## 🔑 Autenticação {#autenticacao}
+### 🔑 Autenticação {#autenticacao}
 - **Header**: Authorization: Bearer <JWT_TOKEN>
 - **Middleware**: authorized para permissões
 
-## 📚 Documentação das Rotas
-## Usuários {#usuarios}
+### 📚 Documentação das Rotas {#documentacao-das-rotas}
+#### Usuários {#usuarios}
 
 | Método	|   Endpoint  | Descrição                         |   Permissão   |
 |---------|-------------|-----------------------------------|---------------|
@@ -98,7 +98,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT     | /me/:userId | Atualiza usuário                  |    PUT:USER   |
 | DELETE  | /me/:userId | Soft delete do usuario            |  DELETE:USER  |
 
-## Lojas {#lojas}
+#### Lojas {#lojas}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -108,7 +108,7 @@ DELETION_GRACE_PERIOD = 30
 |  DELETE   | /stores/:storeId | Soft delete da loja | DELETE:STORE |
 |    PUT    | /stores/:storeId/revert | Reverte a deleção da loja | PUT:STORE_DELETE |
 
-## Roles {#roles}
+#### Roles {#roles}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -117,7 +117,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/roles/:roleId | Atualiza a role | PUT:ROLE |
 | DELETE | /stores/:storeId/roles/:roleId | Delete a role | DELETE:ROLE |
 
-## StoreUsers (Funcionários) {#funcionarios-storeusers}
+#### StoreUsers (Funcionários) {#funcionarios-storeusers}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -127,7 +127,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/users/:storeUserId | Atualiza funcionário | PUT:STORE_USER |
 | DELETE | /stores/:storeId/users/:storeUserId | Exclui funcionário	| DELETE:STORE_USER |
 
-## Categorias {#categorias}
+#### Categorias {#categorias}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -136,7 +136,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/categories/:categoryId	| Atualiza categoria | PUT:CATEGORY |
 | DELETE | /stores/:storeId/categories/:categoryId | Exclui categoria	| DELETE:CATEGORY |
 
-## Produtos {#produtos}
+#### Produtos {#produtos}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -145,7 +145,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/categories/:categoryId/products/:productId	| Atualiza produto | PUT:PRODUCT |
 | DELETE | /stores/:storeId/categories/:categoryId/products/:productId | Exclui produto	 | DELETE:PRODUCT |
 
-## Estoque {#estoque}
+#### Estoque {#estoque}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -153,13 +153,13 @@ DELETION_GRACE_PERIOD = 30
 |GET | /stores/:storeId/products/:productId/stocks/movements | Lista movimentações | GET:STOCK |
 | POST | /stores/:storeId/products/:productId/stocks/movements/:movementId/revert | Reverte movimentação | POST:STOCK |
 
-## Auditoria {#auditoria}
+#### Auditoria {#auditoria}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
 | GET |	/audit-logs | Lista logs de auditoria | GET:AUDIT_LOG |
 
-## 🚨 Tratamento de Erros {#tratamento-de-erros}
+### 🚨 Tratamento de Erros {#tratamento-de-erros}
 ```bash
 {
   "error": "Tipo do erro",
