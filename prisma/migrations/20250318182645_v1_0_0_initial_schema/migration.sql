@@ -5,11 +5,11 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "isOwner" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "lastActivityAt" TIMESTAMP(3),
-    "deletionWarningSentAt" TIMESTAMP(3),
-    "markedForDeletionAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "lastActivityAt" TIMESTAMPTZ,
+    "deletionWarningSentAt" TIMESTAMPTZ,
+    "markedForDeletionAt" TIMESTAMPTZ,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -22,11 +22,11 @@ CREATE TABLE "stores" (
     "state" CHAR(2) NOT NULL,
     "zipCode" CHAR(9) NOT NULL,
     "ownerId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
-    "lastActivityAt" TIMESTAMP(3),
+    "lastActivityAt" TIMESTAMPTZ,
 
     CONSTRAINT "stores_pkey" PRIMARY KEY ("id")
 );
@@ -40,10 +40,10 @@ CREATE TABLE "StoreUser" (
     "roleId" INTEGER NOT NULL,
     "storeId" INTEGER NOT NULL,
     "createdBy" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedBy" INTEGER NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedBy" INTEGER,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "StoreUser_pkey" PRIMARY KEY ("id")
@@ -54,9 +54,9 @@ CREATE TABLE "Role" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "Role_pkey" PRIMARY KEY ("id")
@@ -68,8 +68,8 @@ CREATE TABLE "Permission" (
     "name" TEXT NOT NULL,
     "action" TEXT NOT NULL,
     "resource" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT "Permission_pkey" PRIMARY KEY ("id")
 );
@@ -79,8 +79,8 @@ CREATE TABLE "RolePermissionAssociation" (
     "id" SERIAL NOT NULL,
     "roleId" INTEGER NOT NULL,
     "permissionId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT "RolePermissionAssociation_pkey" PRIMARY KEY ("id")
 );
@@ -90,9 +90,9 @@ CREATE TABLE "Category" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "Category_pkey" PRIMARY KEY ("id")
@@ -108,9 +108,9 @@ CREATE TABLE "Product" (
     "description" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
     "categoryId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
@@ -124,9 +124,9 @@ CREATE TABLE "StockMoviment" (
     "type" TEXT NOT NULL,
     "storeId" INTEGER NOT NULL,
     "isValid" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "StockMoviment_pkey" PRIMARY KEY ("id")
@@ -137,7 +137,7 @@ CREATE TABLE "StockMovimentStore" (
     "id" SERIAL NOT NULL,
     "stockMovimentId" INTEGER NOT NULL,
     "storeId" INTEGER NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "deletedAt" TIMESTAMPTZ,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "StockMovimentStore_pkey" PRIMARY KEY ("id")
@@ -154,7 +154,7 @@ CREATE TABLE "AuditLog" (
     "ipAddress" TEXT,
     "userAgent" TEXT,
     "isOwner" BOOLEAN,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
 );
