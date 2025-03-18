@@ -123,7 +123,7 @@ router.get("/stores",
   }
 );
 
-router.put("/stores/:id",
+router.put("/stores/:storeId",
   authenticated,
   authorized("PUT", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -131,7 +131,7 @@ router.put("/stores/:id",
   }
 );
 
-router.delete("/stores/:id",
+router.delete("/stores/:storeId",
   authenticated,
   authorized("DELETE", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -139,7 +139,7 @@ router.delete("/stores/:id",
   }
 );
 
-router.post("/stores/:id/revert",
+router.post("/stores/:storeId/revert",
   authenticated,
   authorized("POST", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -228,7 +228,7 @@ router.post("/store/:storeId/users/:id/acl",
 );
 
 // CATEGORY ROUTES
-router.post("/categories",
+router.post("/store/:storeId/categories",
   authenticated,
   authorized("POST", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -236,7 +236,7 @@ router.post("/categories",
   }
 );
 
-router.get("/categories",
+router.get("/store/:storeId/categories",
   authenticated,
   authorized("GET", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -244,7 +244,7 @@ router.get("/categories",
   }
 );
 
-router.put("/categories/:id",
+router.put("/store/:storeId/categories/:categoryId",
   authenticated,
   authorized("PUT", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -252,7 +252,7 @@ router.put("/categories/:id",
   }
 );
 
-router.delete("/categories/:id",
+router.delete("/store/:storeId/categories/:categoryId",
   authenticated,
   authorized("DELETE", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -261,7 +261,7 @@ router.delete("/categories/:id",
 );
 
 // PRODUCT ROUTES
-router.post("/products",
+router.post("/store/:storeId/category/:categoryId/products",
   authenticated,
   authorized("POST", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -269,7 +269,7 @@ router.post("/products",
   }
 );
 
-router.get("/products",
+router.get("/store/:storeId/category/:categoryId/products",
   authenticated,
   authorized("GET", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -277,7 +277,7 @@ router.get("/products",
   }
 );
 
-router.put("/products/:id",
+router.put("/store/:storeId/category/:categoryId/products/:productId",
   authenticated,
   authorized("PUT", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -285,7 +285,7 @@ router.put("/products/:id",
   }
 );
 
-router.delete("/products/:id",
+router.delete("/store/:storeId/category/:categoryId/products/:productId",
   authenticated,
   authorized("DELETE", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -294,7 +294,7 @@ router.delete("/products/:id",
 );
 
 // STOCK ROUTES
-router.post("/stock/movements",
+router.post("/store/:storeId/product/:productId/stock/movements",
   authenticated,
   authorized("POST", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -302,7 +302,7 @@ router.post("/stock/movements",
   }
 );
 
-router.get("/stock/movements",
+router.get("/store/:storeId/product/:productId/stock/movements",
   authenticated,
   authorized("GET", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -310,7 +310,7 @@ router.get("/stock/movements",
   }
 );
 
-router.post("/stock/movements/:id/revert",
+router.post("/store/:storeId/product/:productId/stock/movements/:movementId/revert",
   authenticated,
   authorized("POST", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {

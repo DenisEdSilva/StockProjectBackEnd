@@ -4,15 +4,16 @@ import { UpdateCategoryService } from "../../services/category/UpdateCategorySer
 class UpdateCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = parseInt(req.params.id, 10);
+            const {storeId, categoryId } = req.params;
+            const performedByUserId = req.userId;
             const { name } = req.body;
-            const userId = req.userId;
     
             const service = new UpdateCategoryService();
             const updatedCategory = await service.execute({
-                id,
+                storeId: parseInt(storeId, 10),
+                categoryId: parseInt(categoryId, 10),
+                performedByUserId,
                 name,
-                userId,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });

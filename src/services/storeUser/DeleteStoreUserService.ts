@@ -35,7 +35,7 @@ class DeleteStoreUserService {
 
             await tx.auditLog.create({
                 data: {
-                    action: "STORE_USER_DELETED",
+                    action: "STORE_USER_DELETE",
                     details: JSON.stringify({
                         deletedBy: data.deletedBy,
                         device: data.userAgent

@@ -44,7 +44,7 @@ class CreateStoreUserAccessControlListService {
 
             await tx.auditLog.create({
                 data: {
-                    action: "ACL_CREATED",
+                    action: "ACL_CREATE",
                     details: `ACL gerado para usuário ${user.id}`,
                     userId: storeUserId
                 }

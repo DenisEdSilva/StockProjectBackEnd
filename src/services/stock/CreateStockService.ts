@@ -1,12 +1,13 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface StockRequest {
     productId: number;
     type: 'entrada' | 'saida';
     stock: number;
     storeId: number;
-    userId: number;
+    performedByUserId: number;
     ipAddress: string;
     userAgent: string;
 }
@@ -22,8 +23,11 @@ class CreateStockService {
     }
 
     async execute(data: StockRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
+
+            const isOwner = await tx.store.findUnique({ where: { id: data.storeId }, select: { ownerId: true } });
 
             const [product, store] = await Promise.all([
                 tx.product.findUnique({ where: { id: data.productId } }),
@@ -55,15 +59,22 @@ class CreateStockService {
                 })
             ]);
 
-            await tx.auditLog.create({
-                data: {
-                    action: "STOCK_MOVIMENT_CREATED",
-                    details: JSON.stringify(stockMoviment),
-                    userId: data.userId,
-                    storeId: data.storeId,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                }
+            await auditLogService.create({
+                action: "STOCK_MOVIMENT_CREATE",
+                details: {
+                    type: data.type,
+                    stock: data.stock,
+                    productId: data.productId,
+                    storeId: data.storeId
+                },
+                ...(isOwner ? {
+                    userId: data.performedByUserId
+                } : {
+                    storeUserId: data.performedByUserId
+                }),
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return stockMoviment;

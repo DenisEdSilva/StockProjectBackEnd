@@ -37,7 +37,7 @@ class RevertDeleteStoreService {
 
             await tx.auditLog.create({
                 data: {
-                    action: "STORE_RESTORED",
+                    action: "STORE_RESTORE",
                     details: JSON.stringify({ storeId: data.storeId }),
                     userId: data.userId,
                     storeId: data.storeId,

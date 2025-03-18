@@ -4,18 +4,19 @@ import { UpdateProductService } from "../../services/products/UpdateProductServi
 class UpdateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = parseInt(req.params.id, 10);
-            const { name, price, description, categoryId } = req.body;
-            const userId = req.userId;
+            const performedByUserId = req.userId;
+            const { storeId, productId, categoryId } = req.params;
+            const { name, price, description } = req.body;
     
             const service = new UpdateProductService();
             const product = await service.execute({
-                id,
+                categoryId: parseInt(categoryId, 10),
+                productId: parseInt(productId, 10),
+                storeId: parseInt(storeId, 10),
                 name,
                 price,
                 description,
-                categoryId,
-                userId,
+                performedByUserId,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });

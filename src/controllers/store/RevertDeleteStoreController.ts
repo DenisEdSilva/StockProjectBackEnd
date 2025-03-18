@@ -4,7 +4,7 @@ import { RevertDeleteStoreService } from "../../services/store/RevertDeleteStore
 class RevertDeleteStoreController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id: storeId } = req.params;
+            const { storeId } = req.params;
             const userId = req.userId;
     
             const revertService = new RevertDeleteStoreService();

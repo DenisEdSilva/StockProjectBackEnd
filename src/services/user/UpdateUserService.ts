@@ -82,7 +82,7 @@ class UpdateUserService {
             })
 
             await auditLogService.create({
-                action: "USER_UPDATED",
+                action: "USER_UPDATE",
                 details: {
                     changedFields: Object.keys(updateData),
                     oldEmail: userExists.email,

@@ -36,7 +36,7 @@ class DeleteStoreService {
 
             await tx.auditLog.create({
                 data: {
-                    action: "STORE_DELETED",
+                    action: "STORE_DELETE",
                     details: JSON.stringify({ storeId: data.storeId, deletionType: "SOFT_DELETE" }),
                     userId: data.ownerId,
                     storeId: data.storeId,

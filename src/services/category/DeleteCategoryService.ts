@@ -86,7 +86,7 @@ class DeleteCategoryService {
 
             await tx.auditLog.create({
                 data: {
-                    action: "CATEGORY_DELETED",
+                    action: "CATEGORY_DELETE",
                     details: JSON.stringify({
                         categoryId: id,
                         deletedProducts: category.products.length

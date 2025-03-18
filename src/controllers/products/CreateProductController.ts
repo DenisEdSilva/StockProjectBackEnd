@@ -4,8 +4,9 @@ import { CreateProductService } from "../../services/products/CreateProductServi
 class CreateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { banner, name, stock, price, description, categoryId, storeId } = req.body;
-            const userId = req.userId;
+            const { banner, name, stock, price, description } = req.body;
+            const performedByUserId = req.userId;
+            const { categoryId, storeId } = req.params;
     
             const service = new CreateProductService();
             const product = await service.execute({
@@ -14,9 +15,9 @@ class CreateProductController {
                 stock,
                 price,
                 description,
-                categoryId,
-                storeId,
-                userId,
+                categoryId: parseInt(categoryId, 10),
+                storeId: parseInt(storeId, 10),
+                performedByUserId,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });

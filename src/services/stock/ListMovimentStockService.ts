@@ -26,7 +26,6 @@ class ListMovimentStockService {
                     id: true,
                     type: true,
                     stock: true,
-                    createdAt: true,
                     product: { select: { name: true, banner: true } }
                 },
                 orderBy: { createdAt: 'desc' }

@@ -4,11 +4,12 @@ import { ListMovimentStockService } from "../../services/stock/ListMovimentStock
 class ListMovimentStockController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const storeId = parseInt(req.params.storeId, 10);
-            const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
+            const { storeId, productId } = req.params;
     
             const service = new ListMovimentStockService();
-            const result = await service.execute({ storeId, productId });
+            const result = await service.execute({ 
+                storeId: parseInt(storeId, 10),
+                productId: productId ? parseInt(productId, 10) : undefined});
     
             return res.status(200).json(result);
         } catch (error) {

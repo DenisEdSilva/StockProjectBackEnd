@@ -1,22 +1,34 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface StockRequest {
-    wrongMovimentId: number;
-    userId: number;
+    movementId: number;
+    storeId: number;
+    productId: number;
+    performedByUserId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class RevertStockService {
     async execute(data: StockRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
-            if (!data.wrongMovimentId || isNaN(data.wrongMovimentId)) {
+            const isOwner = await tx.store.findUnique({ 
+                where: { 
+                    id: data.storeId 
+                }, select: { 
+                    ownerId: true 
+                } 
+            });
+
+            if (!data.movementId || isNaN(data.movementId)) {
                 throw new ValidationError("ID da movimentação inválido");
             }
 
             const wrongMoviment = await tx.stockMoviment.findUnique({
-                where: { id: data.wrongMovimentId },
+                where: { id: data.movementId },
                 include: { product: true }
             });
 
@@ -43,23 +55,28 @@ class RevertStockService {
                     data: { stock: { increment: reverseAmount } }
                 }),
                 tx.stockMoviment.update({
-                    where: { id: data.wrongMovimentId },
+                    where: { id: data.movementId },
                     data: { isValid: false }
                 })
             ]);
 
-            await tx.auditLog.create({
-                data: {
-                    action: "STOCK_REVERTED",
-                    details: JSON.stringify({
-                        originalMoviment: data.wrongMovimentId,
-                        newMoviment: newMoviment.id
-                    }),
-                    userId: data.userId,
-                    storeId: wrongMoviment.storeId,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                }
+            const oldData = JSON.stringify(wrongMoviment, null, 2);
+            const newData = JSON.stringify(newMoviment, null, 2);
+
+            await auditLogService.create({
+                action: "STOCK_REVERT",
+                details: {
+                    oldData,
+                    newData
+                },
+                ...(isOwner ? {
+                    userId: data.performedByUserId
+                } : {
+                    storeUserId: data.performedByUserId
+                }),
+                storeId: wrongMoviment.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return { 

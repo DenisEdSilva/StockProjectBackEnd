@@ -4,14 +4,14 @@ import { UpdateStoreService } from "../../services/store/UpdateStoreService";
 class UpdateStoreController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
+            const { storeId } = req.params;
             const { name, city, state, zipCode } = req.body;
             const userId = req.userId;
             const performedByUserId = req.userId;
     
             const updateStoreService = new UpdateStoreService();
             const result = await updateStoreService.execute({
-                id: parseInt(id, 10),
+                id: parseInt(storeId, 10),
                 performedByUserId,
                 name,
                 city,

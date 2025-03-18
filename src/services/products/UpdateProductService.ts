@@ -1,24 +1,37 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateProductRequest {
-    id: number;
+    performedByUserId: number;
+    storeId: number;
+    categoryId?: number;
+    productId: number;
     name?: string;
     price?: string;
     description?: string;
-    categoryId?: number;
-    userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateProductService {
     async execute(data: UpdateProductRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
-            if (!data.id || isNaN(data.id)) throw new ValidationError("ID do produto inválido");
 
-            const product = await tx.product.findUnique({ where: { id: data.id } });
+            const isOwner = await tx.store.findUnique({ 
+                where: { 
+                    id: data.storeId 
+                }, 
+                select: { 
+                    ownerId: true 
+                } 
+            });
+
+            if (!data.productId || isNaN(data.productId)) throw new ValidationError("ID do produto inválido");
+
+            const product = await tx.product.findUnique({ where: { id: data.productId } });
             if (!product) throw new NotFoundError("Produto não encontrado");
             if (product.isDeleted) throw new ConflictError("Produto excluído");
 
@@ -28,20 +41,33 @@ class UpdateProductService {
             }
 
             const updatedProduct = await tx.product.update({
-                where: { id: data.id },
-                data: { ...data },
+                where: { id: data.productId },
+                data: { 
+                    name: data.name,
+                    price: data.price,
+                    description: data.description,
+                    categoryId: data.categoryId
+                },
                 select: { id: true, name: true, price: true, stock: true }
             });
 
-            await tx.auditLog.create({
-                data: {
-                    action: "PRODUCT_UPDATED",
-                    details: JSON.stringify(updatedProduct),
-                    userId: data.userId,
-                    storeId: product.storeId,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                }
+            const oldData = JSON.stringify(product, null, 2);
+            const newData = JSON.stringify(updatedProduct, null, 2);
+
+            await auditLogService.create({
+                action: "PRODUCT_UPDATE",
+                details: {
+                    oldData,
+                    newData
+                },
+                ...(isOwner ? {
+                    userId: data.performedByUserId
+                } : {
+                    storeUserId: data.performedByUserId
+                }),
+                storeId: product.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return updatedProduct;

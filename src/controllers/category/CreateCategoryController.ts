@@ -7,9 +7,11 @@ class CreateCategoryController {
             const { name } = req.body;
             const storeId = parseInt(req.params.storeId, 10);
             const userId = req.userId;
+            
     
             const service = new CreateCategoryService();
             const category = await service.execute({
+                performedByUserId: userId,
                 name,
                 storeId,
                 userId,

@@ -1,51 +1,65 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateCategoryRequest {
-    id: number;
+    storeId: number;
+    categoryId: number;
+    performedByUserId: number;
     name: string;
-    userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateCategoryService {
-    private validateInput(name: string) {
-        if (!name?.trim()) throw new ValidationError("Nome inválido");
-        if (name.length > 50) throw new ValidationError("Nome muito longo (máx. 50 caracteres)");
-    }
-
-    async execute({ id, name, userId, ipAddress, userAgent }: UpdateCategoryRequest) {
+    async execute({ storeId, categoryId, performedByUserId, name, ipAddress, userAgent }: UpdateCategoryRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(name);
-            if (!id || isNaN(id)) throw new ValidationError("ID da categoria inválido");
+            if (!storeId || isNaN(storeId)) throw new ValidationError("storeId da categoria inválido");
 
-            const category = await tx.category.findUnique({ where: { id } });
+            const isOwner = await tx.store.findUnique({
+                where: { 
+                    id: storeId 
+                },
+                select: {
+                    ownerId: true
+                }
+            });
+
+            const category = await tx.category.findUnique({ where: { id: categoryId } });
             if (!category) throw new NotFoundError("Categoria não encontrada");
             if (category.isDeleted) throw new ConflictError("Categoria excluída");
 
             const updatedCategory = await tx.category.update({
-                where: { id },
+                where: { id: categoryId },
                 data: { name },
-                select: { id: true, name: true, updatedAt: true }
+                select: { storeId: true, name: true, updatedAt: true }
             });
 
-            await tx.auditLog.create({
-                data: {
-                    action: "CATEGORY_UPDATED",
-                    details: JSON.stringify({
-                        oldName: category.name,
-                        newName: updatedCategory.name
-                    }),
-                    userId,
-                    storeId: category.storeId,
-                    ipAddress,
-                    userAgent
-                }
+            await auditLogService.create({
+                action: "CATEGORY_UPDATE",
+                details: {
+                    oldName: category.name,
+                    newName: updatedCategory.name
+                },
+                ...(isOwner ? {
+                    userId: performedByUserId
+                } : {
+                    storeUserId: performedByUserId
+                }),
+                storeId: category.storeId,
+                ipAddress,
+                userAgent
             });
 
             return updatedCategory;
         });
+    }
+
+    private validateInput(name: string) {
+        if (!name?.trim()) throw new ValidationError("Nome inválido");
+        if (name.length > 50) throw new ValidationError("Nome muito longo (máx. 50 caracteres)");
     }
 }
 

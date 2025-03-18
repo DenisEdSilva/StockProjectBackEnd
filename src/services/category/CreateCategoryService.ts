@@ -1,7 +1,9 @@
 import prismaClient from "../../prisma";
-import { ValidationError, ConflictError, NotFoundError } from "../../errors";
+import { ValidationError, ConflictError, NotFoundError, UnauthorizedError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface CategoryRequest {
+    performedByUserId: number;
     name: string;
     storeId: number;
     userId: number;
@@ -10,14 +12,31 @@ interface CategoryRequest {
 }
 
 class CreateCategoryService {
-    private validateInput(name: string, storeId: number) {
-        if (!name?.trim()) throw new ValidationError("Nome da categoria inválido");
-        if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
-    }
-
-    async execute({ name, storeId, userId, ipAddress, userAgent }: CategoryRequest) {
+    async execute({ performedByUserId, name, storeId, userId, ipAddress, userAgent }: CategoryRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(name, storeId);
+
+            const storeData = await tx.store.findUnique({
+                            where: { id: storeId },
+                            select: { ownerId: true }
+                        });
+            
+                        const isOwner = storeData.ownerId === performedByUserId;
+            
+                        if (!isOwner) {
+                            const storeUserPerformer = await tx.storeUser.findUnique({
+                                where: {
+                                    id: performedByUserId,
+                                    storeId: storeId,
+                                    isDeleted: false
+                                }
+                            });
+                            
+                            if (!storeUserPerformer) {
+                                throw new UnauthorizedError("Usuário não autorizado");
+                            }
+                        }
 
             const [store, existingCategory] = await Promise.all([
                 tx.store.findUnique({ where: { id: storeId } }),
@@ -65,19 +84,29 @@ class CreateCategoryService {
 
             await Promise.all(updates);
 
-            await tx.auditLog.create({
-                data: {
-                    action: "CATEGORY_CREATED",
-                    details: JSON.stringify(category),
-                    userId,
+            await auditLogService.create({
+                    action: "CATEGORY_CREATE",
+                    details: {
+                        id: category.id,
+                        name: category.name
+                    },
+                    ...(isOwner ? {
+                        userId: performedByUserId,
+                    } : {
+                        storeUserId: performedByUserId
+                    }),
                     storeId,
                     ipAddress,
                     userAgent
-                }
             });
 
             return category;
         });
+    }
+
+    private validateInput(name: string, storeId: number) {
+        if (!name?.trim()) throw new ValidationError("Nome da categoria inválido");
+        if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
     }
 }
 
