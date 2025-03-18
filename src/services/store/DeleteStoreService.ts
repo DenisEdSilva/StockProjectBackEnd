@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface DeleteStoreRequest {
     performedByUserId: number;
@@ -12,6 +13,7 @@ interface DeleteStoreRequest {
 class DeleteStoreService {
     async execute(data: DeleteStoreRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
 
             const isOwner = await tx.store.findUnique({
@@ -41,6 +43,12 @@ class DeleteStoreService {
                 where: { id: data.storeId },
                 data: { isDeleted: true, deletedAt: new Date() }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
 
             const deletedData = await tx.store.findUnique({ where: { id: data.storeId } });
 

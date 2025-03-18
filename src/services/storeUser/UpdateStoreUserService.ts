@@ -7,6 +7,7 @@ import {
     UnauthorizedError
 } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UpdateRequest {
     performedByUserId: number;
@@ -24,6 +25,7 @@ interface UpdateRequest {
 class UpdateStoreUserService {
     async execute(data: UpdateRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -91,6 +93,12 @@ class UpdateStoreUserService {
                     updatedAt: true
                 }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
             
             await auditLogService.create({
                 action: "USER_UPDATE",

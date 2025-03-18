@@ -1,6 +1,8 @@
 import prismaClient from "../../prisma";
 import { hash } from "bcryptjs";
 import { ValidationError, ConflictError, NotFoundError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UserRequest {
     userId: number;
@@ -11,11 +13,11 @@ interface UserRequest {
     ipAddress: string;
     userAgent: string;
 }
-import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 class UpdateUserService {
     async execute({ userId, performedByUserId, name, email, password, ipAddress, userAgent }: UserRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             if (performedByUserId !== userId) {
                 throw new ValidationError("Apenas o próprio usuário pode atualizar seus dados");
@@ -79,6 +81,11 @@ class UpdateUserService {
                 data: { 
                     lastActivityAt: new Date() 
                 }
+            })
+
+            await activityTracker.track({
+                tx,
+                performedByUserId: performedByUserId
             })
 
             await auditLogService.create({

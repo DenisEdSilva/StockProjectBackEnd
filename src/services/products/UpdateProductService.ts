@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UpdateProductRequest {
     performedByUserId: number;
@@ -17,6 +18,7 @@ interface UpdateProductRequest {
 class UpdateProductService {
     async execute(data: UpdateProductRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -50,6 +52,12 @@ class UpdateProductService {
                 },
                 select: { id: true, name: true, price: true, stock: true }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
 
             const oldData = JSON.stringify(product, null, 2);
             const newData = JSON.stringify(updatedProduct, null, 2);

@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface StockRequest {
     productId: number;
@@ -24,6 +25,7 @@ class CreateStockService {
 
     async execute(data: StockRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -56,8 +58,14 @@ class CreateStockService {
                 tx.product.update({
                     where: { id: data.productId },
                     data: { stock: { increment: data.type === 'entrada' ? data.stock : -data.stock } }
-                })
+                }),
             ]);
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
 
             await auditLogService.create({
                 action: "STOCK_MOVIMENT_CREATE",

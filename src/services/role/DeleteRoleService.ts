@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface DeleteRoleRequest {
     performedByUserId: number;
@@ -13,6 +14,7 @@ interface DeleteRoleRequest {
 class DeleteRoleService {
     async execute({ performedByUserId, storeId, roleId, ipAddress, userAgent }: DeleteRoleRequest) {
         const auditlogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
 
@@ -40,6 +42,12 @@ class DeleteRoleService {
                 where: { id: roleId },
                 data: { isDeleted: true, deletedAt: new Date() }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: storeId,
+                performedByUserId: performedByUserId
+            })
 
             const deletedData = await tx.role.findUnique({ where: { id: roleId }})
 

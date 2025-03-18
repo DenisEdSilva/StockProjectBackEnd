@@ -4,6 +4,7 @@ import {
     NotFoundError 
 } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface DeleteRequest {
     performedByUserId: number;
@@ -16,6 +17,7 @@ interface DeleteRequest {
 class DeleteStoreUserService {
     async execute(data: DeleteRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -43,6 +45,12 @@ class DeleteStoreUserService {
                     deletedBy: data.performedByUserId
                 }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
 
             const deletedData = await tx.storeUser.findUnique({ where: { id: data.storeUserId } });
 

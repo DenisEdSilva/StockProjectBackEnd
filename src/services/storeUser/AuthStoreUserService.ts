@@ -7,6 +7,7 @@ import {
     UnauthorizedError 
 } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface AuthRequest {
     storeId: number;
@@ -29,6 +30,7 @@ interface AuthResponse {
 class AuthStoreUserService {
     async execute(data: AuthRequest): Promise<AuthResponse> {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -66,6 +68,11 @@ class AuthStoreUserService {
                 action: rp.permission.action,
                 resource: rp.permission.resource
             })) || [];
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId
+            })
 
             await auditLogService.create({
                 action: "STORE_USER_LOGIN",

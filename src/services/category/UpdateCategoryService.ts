@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UpdateCategoryRequest {
     storeId: number;
@@ -14,6 +15,7 @@ interface UpdateCategoryRequest {
 class UpdateCategoryService {
     async execute({ storeId, categoryId, performedByUserId, name, ipAddress, userAgent }: UpdateCategoryRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(name);
             if (!storeId || isNaN(storeId)) throw new ValidationError("storeId da categoria inválido");
@@ -36,6 +38,12 @@ class UpdateCategoryService {
                 data: { name },
                 select: { storeId: true, name: true, updatedAt: true }
             });
+
+            await activityTracker.track({
+                tx,
+                storeId: storeId,
+                performedByUserId: performedByUserId
+            })
 
             await auditLogService.create({
                 action: "CATEGORY_UPDATE",

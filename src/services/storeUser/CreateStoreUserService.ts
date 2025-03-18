@@ -6,9 +6,10 @@ import {
     NotFoundError 
 } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface StoreUserRequest {
-    performedbyUserId: number;
+    performedByUserId: number;
     name: string;
     email: string;
     password: string;
@@ -23,6 +24,7 @@ interface StoreUserRequest {
 class CreateStoreUserService {
     async execute(data: StoreUserRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -59,6 +61,12 @@ class CreateStoreUserService {
                 }
             });
 
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
+
             await auditLogService.create({
                 action: "CREATE_STORE_USER",
                 details: { 
@@ -68,7 +76,7 @@ class CreateStoreUserService {
                     roleId: user.roleId,
                     createdBy: data.createdBy
                 },
-                userId: data.performedbyUserId,
+                userId: data.performedByUserId,
                 storeId: data.storeId,
                 ipAddress: data.ipAddress,
                 userAgent: data.userAgent

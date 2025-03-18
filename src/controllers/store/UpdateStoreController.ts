@@ -11,7 +11,7 @@ class UpdateStoreController {
     
             const updateStoreService = new UpdateStoreService();
             const result = await updateStoreService.execute({
-                id: parseInt(storeId, 10),
+                storeId: parseInt(storeId, 10),
                 performedByUserId,
                 name,
                 city,

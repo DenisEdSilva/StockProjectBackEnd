@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, ConflictError, NotFoundError, UnauthorizedError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface CategoryRequest {
     performedByUserId: number;
@@ -14,6 +15,7 @@ interface CategoryRequest {
 class CreateCategoryService {
     async execute({ performedByUserId, name, storeId, userId, ipAddress, userAgent }: CategoryRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(name, storeId);
 
@@ -83,6 +85,12 @@ class CreateCategoryService {
             }
 
             await Promise.all(updates);
+
+            await activityTracker.track({
+                tx,
+                storeId: storeId,
+                performedByUserId: performedByUserId
+            })
 
             await auditLogService.create({
                     action: "CATEGORY_CREATE",

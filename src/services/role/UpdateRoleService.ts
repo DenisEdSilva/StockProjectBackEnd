@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UpdateRoleRequest {
     performedByUserId: number;
@@ -15,6 +16,7 @@ interface UpdateRoleRequest {
 class UpdateRoleService {
     async execute({ performedByUserId, storeId, roleId, name, permissionIds, ipAddress, userAgent }: UpdateRoleRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
 
             const isOwner = await prismaClient.store.findUnique({ where: { id: storeId }, select: { ownerId: true } });
@@ -77,6 +79,12 @@ class UpdateRoleService {
                     skipDuplicates: true
                 });
             }
+
+            await activityTracker.track({
+                tx,
+                storeId: storeId,
+                performedByUserId: performedByUserId
+            })
 
             await auditLogService.create({
                 action: "ROLE_UPDATE",

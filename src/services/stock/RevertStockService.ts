@@ -1,6 +1,7 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface StockRequest {
     movementId: number;
@@ -14,6 +15,7 @@ interface StockRequest {
 class RevertStockService {
     async execute(data: StockRequest) {
         const auditLogService = new CreateAuditLogService();
+        const activityTracker = new ActivityTracker();
         return await prismaClient.$transaction(async (tx) => {
             const isOwner = await tx.store.findUnique({ 
                 where: { 
@@ -59,6 +61,12 @@ class RevertStockService {
                     data: { isValid: false }
                 })
             ]);
+
+            await activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                performedByUserId: data.performedByUserId
+            })
 
             const oldData = JSON.stringify(wrongMoviment, null, 2);
             const newData = JSON.stringify(newMoviment, null, 2);
