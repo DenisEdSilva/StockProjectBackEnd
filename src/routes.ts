@@ -139,9 +139,9 @@ router.delete("/stores/:storeId",
   }
 );
 
-router.post("/stores/:storeId/revert",
+router.put("/stores/:storeId/revert",
   authenticated,
-  authorized("POST", "STORE"),
+  authorized("PUT", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
     new RevertDeleteStoreController().handle(req, res, next);
   }
