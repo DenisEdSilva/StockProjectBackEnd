@@ -4,13 +4,14 @@ import { DeleteCategoryService } from "../../services/category/DeleteCategorySer
 class DeleteCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = parseInt(req.params.id, 10);
-            const userId = req.userId;
+            const { storeId, categoryId } = req.params;
+            const performedByUserId = req.userId;
     
             const service = new DeleteCategoryService();
             const result = await service.execute({
-                id,
-                userId,
+                performedByUserId,
+                storeId: parseInt(storeId, 10),
+                categoryId: parseInt(categoryId, 10),
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });

@@ -21,6 +21,7 @@ class DetailUserService {
                 id: true,
                 name: true,
                 email: true,
+                ownedStores: true
             },
         });
 

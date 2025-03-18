@@ -1,21 +1,33 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface DeleteCategoryRequest {
-    id: number;
-    userId: number;
+    performedByUserId: number;
+    storeId: number;
+    categoryId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class DeleteCategoryService {
-    async execute({ id, userId, ipAddress, userAgent }: DeleteCategoryRequest) {
+    async execute({ performedByUserId, storeId, categoryId, ipAddress, userAgent }: DeleteCategoryRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
-            if (!id || isNaN(id)) throw new ValidationError("ID da categoria inválido");
+            const isOwner = await tx.store.findUnique({
+                where: {
+                    id: storeId
+                },
+                select: {
+                    ownerId: true
+                }
+            })
+
+            if (!categoryId || isNaN(categoryId)) throw new ValidationError("ID da categoria inválido");
 
             const category = await tx.category.findUnique({
                 where: { 
-                    id: id
+                    id: categoryId
                 },
                 select: {
                     id: true,
@@ -42,7 +54,7 @@ class DeleteCategoryService {
 
             const deletedCategory = await tx.category.update({
                 where: { 
-                    id 
+                    id: categoryId
                 },
                 data: { 
                     isDeleted: true, 
@@ -50,58 +62,30 @@ class DeleteCategoryService {
                 }
             });
 
-            const isOwnerAction = await tx.user.findUnique({ 
-                where: { 
-                    id: userId 
+            const deletedData = await tx.category.findUnique({ where: { id: category.id } });
+
+            await auditLogService.create({
+                action: "CATEGORY_DELETE",
+                details: {
+                    deletedData,
                 },
-                select: {
-                    id: true,
-                }
-            });
-
-            const updates = [];
-
-
-            updates.push(
-                tx.store.update({
-                    where: { id: category.storeId },
-                    data: {
-                        lastActivityAt: new Date(),
-                    }
-                })
-            );
-            
-            if (isOwnerAction) {
-                updates.push(
-                    tx.user.update({
-                        where: { id: userId },
-                        data: {
-                            lastActivityAt: new Date(),
-                        }
-                    })
-                )
-            }
-
-            await Promise.all(updates);
-
-            await tx.auditLog.create({
-                data: {
-                    action: "CATEGORY_DELETE",
-                    details: JSON.stringify({
-                        categoryId: id,
-                        deletedProducts: category.products.length
-                    }),
-                    userId,
-                    storeId: category.storeId,
-                    ipAddress,
-                    userAgent
-                }
+                ...(isOwner ? {
+                    userId: performedByUserId,
+                } : {
+                    storeUserId: performedByUserId
+                }),
+                storeId: category.storeId,
+                ipAddress,
+                userAgent
             });
 
             return { 
                 message: "Categoria e produtos marcados para exclusão",
                 deletedAt: deletedCategory.deletedAt
             };
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 

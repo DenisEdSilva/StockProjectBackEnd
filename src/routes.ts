@@ -148,7 +148,7 @@ router.post("/stores/:storeId/revert",
 );
 
 // ROLE ROUTES
-router.post("/roles/:storeId",
+router.post("/store/:storeId/roles/",
   authenticated,
   authorized("POST", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -156,7 +156,7 @@ router.post("/roles/:storeId",
   }
 );
 
-router.get("/roles/:storeId",
+router.get("/store/:storeId/roles/",
   authenticated,
   authorized("GET", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -164,7 +164,7 @@ router.get("/roles/:storeId",
   }
 );
 
-router.put("/roles/:roleId",
+router.put("/store/:storeId/roles/:roleId",
   authenticated,
   authorized("PUT", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -172,7 +172,7 @@ router.put("/roles/:roleId",
   }
 );
 
-router.delete("/roles/:id",
+router.delete("/store/:storeId/roles/:roleId",
   authenticated,
   authorized("DELETE", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {

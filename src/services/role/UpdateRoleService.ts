@@ -4,6 +4,7 @@ import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateRoleRequest {
     performedByUserId: number;
+    storeId: number;
     roleId: number;
     name: string;
     permissionIds: number[];
@@ -12,9 +13,12 @@ interface UpdateRoleRequest {
 }
 
 class UpdateRoleService {
-    async execute({ performedByUserId, roleId, name, permissionIds, ipAddress, userAgent }: UpdateRoleRequest) {
+    async execute({ performedByUserId, storeId, roleId, name, permissionIds, ipAddress, userAgent }: UpdateRoleRequest) {
         const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
+
+            const isOwner = await prismaClient.store.findUnique({ where: { id: storeId }, select: { ownerId: true } });
+
             if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
             if (!name?.trim()) throw new ValidationError("Nome inválido");
             if (!permissionIds?.length) throw new ValidationError("Deve conter pelo menos uma permissão");
@@ -24,7 +28,6 @@ class UpdateRoleService {
                 include: { rolePermissions: true }
             });
 
-            console.log(role)
             if (!role) throw new NotFoundError("Perfil não encontrado");
 
             const validPermissions = await tx.permission.findMany({ 
@@ -35,8 +38,6 @@ class UpdateRoleService {
             if (validPermissions.length !== permissionIds.length) {
                 throw new ValidationError("Contém permissões inválidas");
             }
-
-            console.log(validPermissions)
 
             await tx.role.update({ 
                 where: { 
@@ -84,8 +85,12 @@ class UpdateRoleService {
                     name,
                     permissionIds
                 },
-                userId: performedByUserId,
-                storeId: role.storeId,
+                ...(isOwner ? {
+                    userId: performedByUserId
+                }: {
+                    storeUserId: performedByUserId
+                }),
+                storeId: storeId,
                 ipAddress: ipAddress,
                 userAgent: userAgent
             })

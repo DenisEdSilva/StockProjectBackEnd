@@ -1,20 +1,34 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface DeleteProductRequest {
-    id: number;
-    userId: number;
+    performedByUserId: number;
+    storeId: number;
+    categoryId: number;
+    productId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class DeleteProductService {
-    async execute({ id, userId, ipAddress, userAgent }: DeleteProductRequest) {
+    async execute({ performedByUserId, storeId, categoryId, productId, ipAddress, userAgent }: DeleteProductRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
-            if (!id || isNaN(id)) throw new ValidationError("ID do produto inválido");
+
+            const isOwner = await tx.store.findUnique({ 
+                where: { 
+                    id: storeId 
+                }, 
+                select: { 
+                    ownerId: true 
+                } 
+            });
+
+            if (!productId || isNaN(productId)) throw new ValidationError("ID do produto inválido");
 
             const product = await tx.product.findUnique({
-                where: { id },
+                where: { id: productId },
                 include: { stockMoviment: true }
             });
 
@@ -27,25 +41,38 @@ class DeleteProductService {
             });
 
             const deletedProduct = await tx.product.update({
-                where: { id },
+                where: { id: productId },
                 data: { isDeleted: true, deletedAt: new Date() }
             });
 
-            await tx.auditLog.create({
-                data: {
-                    action: "PRODUCT_DELETED",
-                    details: JSON.stringify({ productId: id }),
-                    userId,
-                    storeId: product.storeId,
-                    ipAddress,
-                    userAgent
-                }
+            const deletedData = await tx.product.findUnique({ 
+                where: { 
+                    id: productId 
+                } 
+            });
+
+            await auditLogService.create({
+                action: "PRODUCT_DELETE",
+                details: {
+                    deletedData
+                },
+                ...(isOwner ? {
+                    userId: performedByUserId,
+                } : {
+                    storeUserId: performedByUserId
+                }),
+                storeId: product.storeId,
+                ipAddress,
+                userAgent
             });
 
             return { 
                 message: "Produto excluído",
                 deletedAt: deletedProduct.deletedAt
             };
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 }
