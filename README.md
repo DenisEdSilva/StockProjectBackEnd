@@ -1,5 +1,3 @@
-# StockProject
-
 # StockProject API
 
 API para gestão de lojas, estoque, produtos, usuários e auditoria.  
@@ -10,7 +8,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 ## Índice
 - [🛠 Tecnologias](#tecnologias)
 - [🌟 Funcionalidades Principais](#funcionalidades-principais)
-- [📦 Instalação](#instalação)
+- [📦 Instalação](#instalacao)
 - [🔧 Variáveis de Ambiente](#variaveis-de-ambiente)
 - [🔑 Autenticação](#autenticacao)
 - [📚 Documentação das Rotas](#documentacao-das-rotas)
@@ -26,7 +24,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 🛠 Tecnologias
+## 🛠 Tecnologias {#tecnologias}
 - **Node.js** & **Express**  
 - **Prisma** (PostgreSQL)  
 - **JWT** (Autenticação)  
@@ -35,16 +33,16 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 🌟 Funcionalidades Principais
-- Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers).  
-- Controle de permissões baseado em roles.  
-- Auditoria detalhada de todas as ações críticas.  
-- Soft delete e recuperação de recursos.  
-- Movimentações de estoque com reversão.  
+## 🌟 Funcionalidades Principais {#funcionalidades-principais}
+- Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers)  
+- Controle de permissões baseado em roles  
+- Auditoria detalhada de todas as ações críticas  
+- Soft delete e recuperação de recursos  
+- Movimentações de estoque com reversão  
 
 ---
 
-## 📦 Instalação
+## 📦 Instalação {#instalacao}
 ```bash
 # Clone o repositório
 git clone https://github.com/DenisEdSilva/StockProject.git
@@ -52,7 +50,7 @@ git clone https://github.com/DenisEdSilva/StockProject.git
 # Instale as dependências
 npm install
 
-# Execute as migrações e seeds do Prisma (cria estrutura + permissões padrão)
+# Execute as migrações e seeds do Prisma
 npx prisma migrate dev
 npx prisma db seed
 
@@ -62,7 +60,7 @@ npm run dev
 ```
 ---
 
-## 🔧 Variáveis de Ambiente
+## 🔧 Variáveis de Ambiente {#variaveis-de-ambiente}
 
 Crie um arquivo .env na raiz do projeto:
 ```bash
@@ -85,12 +83,12 @@ DELETION_GRACE_PERIOD = 30
 
 ```
 
-## 🔑 Autenticação
+## 🔑 Autenticação {#autenticacao}
 - **Header**: Authorization: Bearer <JWT_TOKEN>
 - **Middleware**: authorized para permissões
 
 ## 📚 Documentação das Rotas
-## Usuários
+## Usuários {#usuarios}
 
 | Método	|   Endpoint  | Descrição                         |   Permissão   |
 |---------|-------------|-----------------------------------|---------------|
@@ -100,7 +98,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT     | /me/:userId | Atualiza usuário                  |    PUT:USER   |
 | DELETE  | /me/:userId | Soft delete do usuario            |  DELETE:USER  |
 
-## Lojas
+## Lojas {#lojas}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -110,7 +108,7 @@ DELETION_GRACE_PERIOD = 30
 |  DELETE   | /stores/:storeId | Soft delete da loja | DELETE:STORE |
 |    PUT    | /stores/:storeId/revert | Reverte a deleção da loja | PUT:STORE_DELETE |
 
-## Roles
+## Roles {#roles}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -119,7 +117,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/roles/:roleId | Atualiza a role | PUT:ROLE |
 | DELETE | /stores/:storeId/roles/:roleId | Delete a role | DELETE:ROLE |
 
-## StoreUsers(funcionários)
+## StoreUsers (Funcionários) {#funcionarios-storeusers}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -129,7 +127,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/users/:storeUserId | Atualiza funcionário | PUT:STORE_USER |
 | DELETE | /stores/:storeId/users/:storeUserId | Exclui funcionário	| DELETE:STORE_USER |
 
-## Categorias
+## Categorias {#categorias}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -138,7 +136,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/categories/:categoryId	| Atualiza categoria | PUT:CATEGORY |
 | DELETE | /stores/:storeId/categories/:categoryId | Exclui categoria	| DELETE:CATEGORY |
 
-## Produtos
+## Produtos {#produtos}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -147,7 +145,7 @@ DELETION_GRACE_PERIOD = 30
 | PUT | /stores/:storeId/categories/:categoryId/products/:productId	| Atualiza produto | PUT:PRODUCT |
 | DELETE | /stores/:storeId/categories/:categoryId/products/:productId | Exclui produto	 | DELETE:PRODUCT |
 
-## Estoque
+## Estoque {#estoque}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
@@ -155,13 +153,13 @@ DELETION_GRACE_PERIOD = 30
 |GET | /stores/:storeId/products/:productId/stocks/movements | Lista movimentações | GET:STOCK |
 | POST | /stores/:storeId/products/:productId/stocks/movements/:movementId/revert | Reverte movimentação | POST:STOCK |
 
-## Auditoria
+## Auditoria {#auditoria}
 
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
 | GET |	/audit-logs | Lista logs de auditoria | GET:AUDIT_LOG |
 
-## 🚨 Tratamento de Erros
+## 🚨 Tratamento de Erros {#tratamento-de-erros}
 ```bash
 {
   "error": "Tipo do erro",
