@@ -85,20 +85,48 @@ DELETION_GRACE_PERIOD = 30
 ```
 
 ## 🔑 Autenticação
-Header: Authorization: Bearer <JWT_TOKEN>
-Middleware: authorized para permissões
+- **Header**: Authorization: Bearer <JWT_TOKEN>
+- **Middleware**: authorized para permissões
 
 ## 📚 Documentação das Rotas
 ## Usuários
-```bash
-Método	Endpoint	Descrição
-POST	/users	Cria usuário owner
-```
+
+| Método	|   Endpoint  | Descrição                         |   Permissão   |
+|---------|-------------|-----------------------------------|---------------|
+| POST	  | /stores	    | Cria loja                         |    Nenhuma    |
+| POST    | /sessions   | Autentica um usuário              |    Nenhuma    |
+| GET     | /me         | Retorna os dados do usuario Owner |    GET:USER   |
+| PUT     | /me/:userId | Atualiza usuário                  |    PUT:USER   |
+| DELETE  | /me/:userId | Soft delete do usuario            |  DELETE:USER  |
 ## Lojas
-```bash
-Método	Endpoint	Descrição
-POST	/stores	Cria loja
-```
+
+| Método	| Endpoint | Descrição |
+|---------|----------|-----------|
+| POST	  | /stores	 | Cria loja |
+
+## Lojas
+
+| Método	| Endpoint | Descrição |
+|---------|----------|-----------|
+| POST	  | /stores	 | Cria loja |
+
+## Lojas
+
+| Método	| Endpoint | Descrição |
+|---------|----------|-----------|
+| POST	  | /stores	 | Cria loja |
+
+## Lojas
+| Método	| Endpoint | Descrição |
+|---------|----------|-----------|
+| POST	  | /stores	 | Cria loja |
+
+## Lojas
+
+| Método	| Endpoint | Descrição |
+|---------|----------|-----------|
+| POST	  | /stores	 | Cria loja |
+
 ## 🚨 Tratamento de Erros
 ```bash
 {
