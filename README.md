@@ -33,7 +33,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-### 🌟 Funcionalidades-Principais
+### 🌟 Funcionalidades Principais
 - Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers)  
 - Controle de permissões baseado em roles  
 - Auditoria detalhada de todas as ações críticas  
@@ -42,7 +42,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-### 📦 Instalaçao
+### 📦 Instalacao
 ```bash
 # Clone o repositório
 git clone https://github.com/DenisEdSilva/StockProject.git
@@ -60,7 +60,7 @@ npm run dev
 ```
 ---
 
-### 🔧 Variaveis-de-Ambiente
+### 🔧 Variaveis de Ambiente
 
 Crie um arquivo .env na raiz do projeto:
 ```bash
@@ -83,11 +83,11 @@ DELETION_GRACE_PERIOD = 30
 
 ```
 
-### 🔑 Autenticaçao
+### 🔑 Autenticacao
 - **Header**: Authorization: Bearer <JWT_TOKEN>
 - **Middleware**: authorized para permissões
 
-### 📚 Documentaçao-das-Rotas
+### 📚 Documentacao das Rotas
 #### Usuarios
 
 | Método	|   Endpoint  | Descrição                         |   Permissão   |
@@ -159,7 +159,7 @@ DELETION_GRACE_PERIOD = 30
 |-----------|----------|-----------|-----------|
 | GET |	/audit-logs | Lista logs de auditoria | GET:AUDIT_LOG |
 
-### 🚨 Tratamento-de-Erros
+### 🚨 Tratamento de Erros
 ```bash
 {
   "error": "Tipo do erro",
