@@ -6,12 +6,12 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 ---
 
 ## Índice
-- [🛠 Tecnologias](#tecnologias)
-- [🌟 Funcionalidades Principais](#funcionalidades-principais)
-- [📦 Instalaçao](#instalacao)
-- [🔧 Variaveis de Ambiente](#variaveis-de-ambiente)
-- [🔑 Autenticaçao](#autenticacao)
-- [📚 Documentação das Rotas](#documentacao-das-rotas)
+- [🛠 Tecnologias](#-tecnologias)
+- [🌟 Funcionalidades Principais](#-funcionalidades-principais)
+- [📦 Instalaçao](#-instalacao)
+- [🔧 Variaveis de Ambiente](#-variaveis-de-ambiente)
+- [🔑 Autenticaçao](#-autenticacao)
+- [📚 Documentação das Rotas](#-documentacao-das-rotas)
   - [Usuarios](#usuarios)
   - [Lojas](#lojas)
   - [Roles](#roles)
@@ -20,11 +20,11 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
   - [Produtos](#produtos)
   - [Estoque](#estoque)
   - [Auditoria](#auditoria)
-- [🚨 Tratamento de Erros](#tratamento-de-erros)
+- [🚨 Tratamento de Erros](#-tratamento-de-erros)
 
 ---
 
-## 🛠 Tecnologias
+## 🛠Tecnologias
 - **Node.js** & **Express**  
 - **Prisma** (PostgreSQL)  
 - **JWT** (Autenticação)  
