@@ -148,7 +148,7 @@ router.put("/stores/:storeId/revert",
 );
 
 // ROLE ROUTES
-router.post("/store/:storeId/roles/",
+router.post("/stores/:storeId/roles/",
   authenticated,
   authorized("POST", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -156,7 +156,7 @@ router.post("/store/:storeId/roles/",
   }
 );
 
-router.get("/store/:storeId/roles/",
+router.get("/stores/:storeId/roles/",
   authenticated,
   authorized("GET", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -164,7 +164,7 @@ router.get("/store/:storeId/roles/",
   }
 );
 
-router.put("/store/:storeId/roles/:roleId",
+router.put("/stores/:storeId/roles/:roleId",
   authenticated,
   authorized("PUT", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -172,7 +172,7 @@ router.put("/store/:storeId/roles/:roleId",
   }
 );
 
-router.delete("/store/:storeId/roles/:roleId",
+router.delete("/stores/:storeId/roles/:roleId",
   authenticated,
   authorized("DELETE", "ROLE"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -181,7 +181,7 @@ router.delete("/store/:storeId/roles/:roleId",
 );
 
 // STORE USER ROUTES
-router.post("/store/:storeId/users",
+router.post("/stores/:storeId/users",
   authenticated,
   authorized("POST", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -189,13 +189,13 @@ router.post("/store/:storeId/users",
   }
 );
 
-router.post("/store/:storeId/sessions",
+router.post("/stores/:storeId/sessions",
   (req: Request, res: Response, next: NextFunction) => {
     new AuthStoreUserController().handle(req, res, next);
   }
 );
 
-router.get("/store/:storeId/users",
+router.get("/stores/:storeId/users",
   authenticated,
   authorized("GET", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -203,7 +203,7 @@ router.get("/store/:storeId/users",
   }
 );
 
-router.put("/store/:storeId/users/:storeUserId",
+router.put("/stores/:storeId/users/:storeUserId",
   authenticated,
   authorized("PUT", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -211,7 +211,7 @@ router.put("/store/:storeId/users/:storeUserId",
   }
 );
 
-router.delete("/store/:storeId/users/:storeUserId",
+router.delete("/stores/:storeId/users/:storeUserId",
   authenticated,
   authorized("DELETE", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -219,7 +219,7 @@ router.delete("/store/:storeId/users/:storeUserId",
   }
 );
 
-router.post("/store/:storeId/users/:id/acl",
+router.post("/stores/:storeId/users/:id/acl",
   authenticated,
   authorized("POST", "STORE_USER_ACL"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -228,7 +228,7 @@ router.post("/store/:storeId/users/:id/acl",
 );
 
 // CATEGORY ROUTES
-router.post("/store/:storeId/categories",
+router.post("/stores/:storeId/categories",
   authenticated,
   authorized("POST", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -236,7 +236,7 @@ router.post("/store/:storeId/categories",
   }
 );
 
-router.get("/store/:storeId/categories",
+router.get("/stores/:storeId/categories",
   authenticated,
   authorized("GET", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -244,7 +244,7 @@ router.get("/store/:storeId/categories",
   }
 );
 
-router.put("/store/:storeId/categories/:categoryId",
+router.put("/stores/:storeId/categories/:categoryId",
   authenticated,
   authorized("PUT", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -252,7 +252,7 @@ router.put("/store/:storeId/categories/:categoryId",
   }
 );
 
-router.delete("/store/:storeId/categories/:categoryId",
+router.delete("/stores/:storeId/categories/:categoryId",
   authenticated,
   authorized("DELETE", "CATEGORY"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -261,7 +261,7 @@ router.delete("/store/:storeId/categories/:categoryId",
 );
 
 // PRODUCT ROUTES
-router.post("/store/:storeId/category/:categoryId/products",
+router.post("/stores/:storeId/categories/:categoryId/products",
   authenticated,
   authorized("POST", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -269,7 +269,7 @@ router.post("/store/:storeId/category/:categoryId/products",
   }
 );
 
-router.get("/store/:storeId/category/:categoryId/products",
+router.get("/stores/:storeId/categories/:categoryId/products",
   authenticated,
   authorized("GET", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -277,7 +277,7 @@ router.get("/store/:storeId/category/:categoryId/products",
   }
 );
 
-router.put("/store/:storeId/category/:categoryId/products/:productId",
+router.put("/stores/:storeId/categories/:categoryId/products/:productId",
   authenticated,
   authorized("PUT", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -285,7 +285,7 @@ router.put("/store/:storeId/category/:categoryId/products/:productId",
   }
 );
 
-router.delete("/store/:storeId/category/:categoryId/products/:productId",
+router.delete("/stores/:storeId/categories:categoryId/products/:productId",
   authenticated,
   authorized("DELETE", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -294,7 +294,7 @@ router.delete("/store/:storeId/category/:categoryId/products/:productId",
 );
 
 // STOCK ROUTES
-router.post("/store/:storeId/product/:productId/stock/movements",
+router.post("/stores/:storeId/products/:productId/stocks/movements",
   authenticated,
   authorized("POST", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -302,7 +302,7 @@ router.post("/store/:storeId/product/:productId/stock/movements",
   }
 );
 
-router.get("/store/:storeId/product/:productId/stock/movements",
+router.get("/stores/:storeId/products/:productId/stocks/movements",
   authenticated,
   authorized("GET", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -310,7 +310,7 @@ router.get("/store/:storeId/product/:productId/stock/movements",
   }
 );
 
-router.post("/store/:storeId/product/:productId/stock/movements/:movementId/revert",
+router.post("/stores/:storeId/products/:productId/stocks/movements/:movementId/revert",
   authenticated,
   authorized("POST", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
