@@ -141,7 +141,7 @@ router.delete("/stores/:storeId",
 
 router.put("/stores/:storeId/revert",
   authenticated,
-  authorized("PUT", "STORE"),
+  authorized("PUT", "STORE_DELETE"),
   (req: Request, res: Response, next: NextFunction) => {
     new RevertDeleteStoreController().handle(req, res, next);
   }

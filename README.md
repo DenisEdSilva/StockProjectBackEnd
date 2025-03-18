@@ -98,34 +98,67 @@ DELETION_GRACE_PERIOD = 30
 | GET     | /me         | Retorna os dados do usuario Owner |    GET:USER   |
 | PUT     | /me/:userId | Atualiza usuário                  |    PUT:USER   |
 | DELETE  | /me/:userId | Soft delete do usuario            |  DELETE:USER  |
-## Lojas
-
-| Método	| Endpoint | Descrição |
-|---------|----------|-----------|
-| POST	  | /stores	 | Cria loja |
 
 ## Lojas
 
-| Método	| Endpoint | Descrição |
-|---------|----------|-----------|
-| POST	  | /stores	 | Cria loja |
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+|   POST	  | /stores	 | Cria loja | POST:STORE |
+|    GET    | /stores | Lista as lojas do owner | GET:STORE |
+|    PUT    | /stores/:storeId | Atualiza a loja | PUT:STORE |
+|  DELETE   | /stores/:storeId | Soft delete da loja | DELETE:STORE |
+|    PUT    | /stores/:storeId/revert | Reverte a deleção da loja | PUT:STORE_DELETE |
 
-## Lojas
+## Roles
 
-| Método	| Endpoint | Descrição |
-|---------|----------|-----------|
-| POST	  | /stores	 | Cria loja |
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| POST	  | /stores/storeId/roles	 | Cria uma role |
+| GET | /stores/:storeId/roles | Lista das roles | GET:ROLE |
+| PUT | /stores/:storeId/roles/:roleId | Atualiza a role | PUT:ROLE |
+| DELETE | /stores/:storeId/roles/:roleId | Delete a role | DELETE:ROLE |
 
-## Lojas
-| Método	| Endpoint | Descrição |
-|---------|----------|-----------|
-| POST	  | /stores	 | Cria loja |
+## StoreUsers(funcionários)
 
-## Lojas
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| POST	  | /stores/:storeId/users | Cria funcionário | POST:STORE_USER |
+| POST | /stores/:storeId/sessions | Autentica funcionário | Nenhuma |
+| GET | /stores/:storeId/users | Lista funcionários | GET:STORE_USER |
+| PUT | /stores/:storeId/users/:storeUserId | Atualiza funcionário | PUT:STORE_USER |
+| DELETE | /stores/:storeId/users/:storeUserId | Exclui funcionário	| DELETE:STORE_USER |
 
-| Método	| Endpoint | Descrição |
-|---------|----------|-----------|
-| POST	  | /stores	 | Cria loja |
+## Categorias
+
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| POST	  | /stores/:storeId/categories	 | Cria categoria | POST:CATEGORY |
+| GET | /stores/:storeId/categories | Lista categorias | GET:CATEGORY |
+| PUT | /stores/:storeId/categories/:categoryId	| Atualiza categoria | PUT:CATEGORY |
+| DELETE | /stores/:storeId/categories/:categoryId | Exclui categoria	| DELETE:CATEGORY |
+
+## Produtos
+
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| POST	  | /stores/:storeId/categories/:categoryId/products	 | Cria produto | PUT:PRODUCT |
+| GET | /stores/:storeId/categories/:categoryId/products | Lista produtos	| GET:PRODUCT |
+| PUT | /stores/:storeId/categories/:categoryId/products/:productId	| Atualiza produto | PUT:PRODUCT |
+| DELETE | /stores/:storeId/categories/:categoryId/products/:productId | DELETE:PRODUCT |
+
+## Estoque
+
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| POST | /stores/:storeId/products/:productId/stocks/movements | Cria movimentação | POST:STOCK |
+|GET | /stores/:storeId/products/:productId/stocks/movements | Lista movimentações | GET:STOCK |
+| POST | /stores/:storeId/products/:productId/stocks/movements/:movementId/revert | Reverte movimentação | POST:STOCK |
+
+## Auditoria
+
+|  Método 	| Endpoint | Descrição | Permissão |
+|-----------|----------|-----------|-----------|
+| GET |	/audit-logs | Lista logs de auditoria | GET:AUDIT_LOG |
 
 ## 🚨 Tratamento de Erros
 ```bash

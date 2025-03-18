@@ -14,6 +14,7 @@ const permissions = [
     { action: 'GET', resource: 'STORE', name: 'STORE:GET' },
     { action: 'PUT', resource: 'STORE', name: 'STORE:PUT' },
     { action: 'DELETE', resource: 'STORE', name: 'STORE:DELETE' },
+    { action: 'PUT', resource: 'STORE_DELETE', name: 'STORE_DELETE:PUT' },
 
     // Rotas de ROLE
     {action: 'POST', resource: 'ROLE', name: 'ROLE:POST'},
