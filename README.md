@@ -63,8 +63,9 @@ npm run dev
 ---
 
 ## 🔧 Variáveis de Ambiente
-```bash
+
 Crie um arquivo .env na raiz do projeto:
+```bash
 DATABASE_URL="postgresql://postgres:admin@localhost:5432/StockProject?schema=public"
 
 #secret JWT hash generation
