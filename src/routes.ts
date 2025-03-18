@@ -189,7 +189,7 @@ router.post("/store/:storeId/users",
   }
 );
 
-router.post("/store/sessions",
+router.post("/store/:storeId/sessions",
   (req: Request, res: Response, next: NextFunction) => {
     new AuthStoreUserController().handle(req, res, next);
   }
@@ -203,7 +203,7 @@ router.get("/store/:storeId/users",
   }
 );
 
-router.put("/store/users/:id",
+router.put("/store/:storeId/users/:storeUserId",
   authenticated,
   authorized("PUT", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -211,7 +211,7 @@ router.put("/store/users/:id",
   }
 );
 
-router.delete("/store/users/:id",
+router.delete("/store/:storeId/users/:storeUserId",
   authenticated,
   authorized("DELETE", "STORE_USER"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -219,7 +219,7 @@ router.delete("/store/users/:id",
   }
 );
 
-router.post("/store/users/:id/acl",
+router.post("/store/:storeId/users/:id/acl",
   authenticated,
   authorized("POST", "STORE_USER_ACL"),
   (req: Request, res: Response, next: NextFunction) => {

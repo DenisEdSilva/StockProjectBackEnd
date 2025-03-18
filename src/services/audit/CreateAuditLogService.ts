@@ -65,17 +65,17 @@ class CreateAuditLogService {
             userAgent: data.userAgent,
             isOwner
         };
-
+    
         if (data.storeId) {
             baseData.store = { connect: { id: data.storeId } };
         }
 
-        if (data.userId) {
-            baseData.user = { connect: { id: data.userId } };
-        } else if (data.storeUserId) {
+        if (data.storeUserId) {
             baseData.storeUser = { connect: { id: data.storeUserId } };
+        } else if (data.userId) {
+            baseData.user = { connect: { id: data.userId } };
         }
-
+    
         return baseData;
     }
 }

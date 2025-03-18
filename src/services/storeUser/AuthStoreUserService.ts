@@ -6,6 +6,7 @@ import {
     NotFoundError, 
     UnauthorizedError 
 } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface AuthRequest {
     storeId: number;
@@ -27,6 +28,7 @@ interface AuthResponse {
 
 class AuthStoreUserService {
     async execute(data: AuthRequest): Promise<AuthResponse> {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -65,28 +67,30 @@ class AuthStoreUserService {
                 resource: rp.permission.resource
             })) || [];
 
-            await tx.auditLog.create({
-                data: {
-                    action: "STORE_USER_LOGIN",
-                    details: JSON.stringify({
-                        method: "email/password",
-                        device: data.userAgent
-                    }),
-                    userId: storeUser.id,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                }
+            await auditLogService.create({
+                action: "STORE_USER_LOGIN",
+                details: {
+                    storeId: storeUser.storeId,
+                    email: storeUser.email,
+                    name: storeUser.name
+                },
+                storeUserId: storeUser.id,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return {
                 id: storeUser.id,
                 name: storeUser.name,
                 email: storeUser.email,
+                token,
                 roleId: storeUser.roleId,
                 storeId: storeUser.storeId,
-                token,
                 permissions
             };
+        }, {
+            maxWait: 15000,
+            timeout: 15000 
         });
     }
 

@@ -5,18 +5,24 @@ import {
     ConflictError, 
     NotFoundError 
 } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface StoreUserRequest {
+    performedbyUserId: number;
     name: string;
     email: string;
     password: string;
     roleId: number;
     storeId: number;
     createdBy: number;
+    ipAddress: string;
+    userAgent: string;
+    isOwner?: boolean;
 }
 
 class CreateStoreUserService {
     async execute(data: StoreUserRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
@@ -36,7 +42,7 @@ class CreateStoreUserService {
 
             const passwordHash = await hash(data.password, 12);
 
-            return await tx.storeUser.create({
+            const user = await tx.storeUser.create({
                 data: {
                     name: data.name,
                     email: data.email,
@@ -52,6 +58,26 @@ class CreateStoreUserService {
                     roleId: true
                 }
             });
+
+            await auditLogService.create({
+                action: "CREATE_STORE_USER",
+                details: { 
+                    storeUserId: user.id,
+                    name: user.name,
+                    email: user.email,
+                    roleId: user.roleId,
+                    createdBy: data.createdBy
+                },
+                userId: data.performedbyUserId,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
+            })
+
+            return user;
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 

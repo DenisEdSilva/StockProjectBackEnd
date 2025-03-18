@@ -3,10 +3,13 @@ import { hash } from "bcryptjs";
 import { 
     ValidationError, 
     NotFoundError, 
-    ConflictError 
+    ConflictError, 
+    UnauthorizedError
 } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface UpdateRequest {
+    performedByUserId: number;
     id: number;
     storeId: number;
     name?: string;
@@ -14,16 +17,42 @@ interface UpdateRequest {
     password?: string;
     roleId?: number;
     updatedBy: number;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class UpdateStoreUserService {
     async execute(data: UpdateRequest) {
+        const auditLogService = new CreateAuditLogService();
         return await prismaClient.$transaction(async (tx) => {
             this.validateInput(data);
 
             const user = await tx.storeUser.findUnique({
                 where: { id: data.id, storeId: data.storeId }
             });
+
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId },
+                select: { ownerId: true }
+            });
+
+            const isOwner = store.ownerId === data.performedByUserId;
+
+            if (!isOwner) {
+                const storeUserPerformer = await tx.storeUser.findUnique({
+                    where: {
+                        id: data.performedByUserId,
+                        storeId: data.storeId,
+                        isDeleted: false
+                    }
+                });
+                
+                if (!storeUserPerformer) {
+                    throw new UnauthorizedError("Usuário não autorizado");
+                }
+            }
+            
+            if (!store) throw new NotFoundError("Loja não encontrada");
 
             if (!user) throw new NotFoundError("Usuário não encontrado");
             if (user.isDeleted) throw new NotFoundError("Usuário desativado");
@@ -62,17 +91,26 @@ class UpdateStoreUserService {
                     updatedAt: true
                 }
             });
-
-            await tx.auditLog.create({
-                data: {
-                    action: "STORE_USER_UPDATED",
-                    details: `Usuário ${data.id} atualizado`,
-                    userId: data.updatedBy,
-                    storeId: data.storeId
+            
+            await auditLogService.create({
+                action: "USER_UPDATE",
+                details: {
+                    name: data.name || user.name,
+                    email: data.email || user.email
+                },
+                ...(isOwner
+                ? { userId: data.performedByUserId } : {
+                    storeUserId: data.performedByUserId
                 }
+                ),
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent
             });
 
             return updatedUser;
+        }, {
+            maxWait: 15000,
+            timeout: 15000
         });
     }
 

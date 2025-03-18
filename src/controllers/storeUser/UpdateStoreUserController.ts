@@ -4,18 +4,22 @@ import { UpdateStoreUserService } from "../../services/storeUser/UpdateStoreUser
 class UpdateStoreUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id, storeId, name, email, password, roleId } = req.body;
+            const { name, email, password, roleId } = req.body;
+            const { storeId, storeUserId } = req.params;
             const updatedBy = req.userId;
     
             const service = new UpdateStoreUserService();
             const result = await service.execute({
-                id: Number(id),
+                performedByUserId: updatedBy,
+                id: Number(storeUserId),
                 storeId: Number(storeId),
                 name,
                 email,
                 password,
                 roleId: roleId ? Number(roleId) : undefined,
-                updatedBy: Number(updatedBy)
+                updatedBy: Number(updatedBy),
+                ipAddress: req.ip,
+                userAgent: req.headers["user-agent"]
             });
     
             return res.status(200).json(result);

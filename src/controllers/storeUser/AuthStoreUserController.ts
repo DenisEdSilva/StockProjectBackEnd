@@ -5,7 +5,8 @@ import { redisClient } from "../../redis.config";
 class AuthStoreUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { storeId, email, password } = req.body;
+            const { storeId } = req.params;
+            const { email, password } = req.body;
         
             const service = new AuthStoreUserService();
             const authResult = await service.execute({
@@ -19,17 +20,20 @@ class AuthStoreUserController {
             await redisClient.setEx(
                 `storeUser:${authResult.id}`,
                 28800,
-                JSON.stringify(authResult)
+                JSON.stringify({
+                    ...authResult,
+                    isOwner: false
+                })
             );
 
             return res.status(200).json({
+                token: authResult.token,
                 user: {
                     id: authResult.id,
                     name: authResult.name,
                     email: authResult.email
                 },
-                permissions: authResult.permissions,
-                token: authResult.token
+                permissions: authResult.permissions
             });
         } catch (error) {
             next(error);
