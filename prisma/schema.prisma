@@ -14,11 +14,11 @@ model User {
   email                 String      @unique
   password              String
   isOwner               Boolean     @default(true)
-  createdAt             DateTime?   @default(now())
-  updatedAt             DateTime    @updatedAt
-  lastActivityAt        DateTime?
-  deletionWarningSentAt DateTime? 
-  markedForDeletionAt   DateTime?
+  createdAt             DateTime?   @default(now()) @db.Timestamptz()
+  updatedAt             DateTime    @updatedAt @db.Timestamptz()
+  lastActivityAt        DateTime?   @db.Timestamptz()
+  deletionWarningSentAt DateTime?   @db.Timestamptz()
+  markedForDeletionAt   DateTime?   @db.Timestamptz()
   
   ownedStores Store[] @relation("StoreOwner")
   AuditLog   AuditLog[]
@@ -33,11 +33,11 @@ model Store {
   state          String @db.Char(2)
   zipCode        String @db.Char(9)
   ownerId        Int
-  createdAt      DateTime? @default(now())
-  updatedAt      DateTime @updatedAt
-  deletedAt      DateTime?
+  createdAt      DateTime? @default(now()) @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @db.Timestamptz()
+  deletedAt      DateTime?  @db.Timestamptz()
   isDeleted      Boolean  @default(false)
-  lastActivityAt DateTime?
+  lastActivityAt DateTime?  @db.Timestamptz()
 
   owner    User   @relation("StoreOwner", fields: [ownerId], references: [id])
   storeUsers StoreUser[] @relation("StoreUserStoreRelation")
@@ -59,10 +59,10 @@ model StoreUser {
   roleId    Int
   storeId   Int
   createdBy Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
   deletedBy Int?
-  deletedAt DateTime?
+  deletedAt DateTime? @db.Timestamptz()
   isDeleted Boolean  @default(false)
 
   store    Store    @relation(fields: [storeId], references: [id], name: "StoreUserStoreRelation")
@@ -74,9 +74,9 @@ model Role {
   id        Int      @id @default(autoincrement())
   name      String
   storeId   Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
   isDeleted Boolean  @default(false)
 
   store                Store                   @relation(fields: [storeId], references: [id], name: "RoleStoreRelation")
@@ -92,8 +92,8 @@ model Permission {
   name      String
   action    String
   resource  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
 
   rolePermissions RolePermissionAssociation[] @relation("PermissionToRole")
   RolePermissionAssociation RolePermissionAssociation[]
@@ -103,8 +103,8 @@ model RolePermissionAssociation {
   id          Int      @id @default(autoincrement())
   roleId      Int
   permissionId Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
 
   role        Role       @relation(fields: [roleId], references: [id])
   permission  Permission @relation(fields: [permissionId], references: [id])
@@ -118,9 +118,9 @@ model Category {
   id        Int      @id @default(autoincrement())
   name      String
   storeId   Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+  deletedAt DateTime? @db.Timestamptz()
   isDeleted Boolean  @default(false)
 
   store    Store    @relation(fields: [storeId], references: [id])
@@ -136,9 +136,9 @@ model Product {
   description String
   storeId     Int
   categoryId  Int
-  createdAt   DateTime? @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt   DateTime? @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+  deletedAt   DateTime? @db.Timestamptz()
   isDeleted   Boolean  @default(false)
 
   store      Store    @relation(fields: [storeId], references: [id])
@@ -153,9 +153,9 @@ model StockMoviment {
   type        String
   storeId     Int
   isValid     Boolean  @default(true)
-  createdAt   DateTime? @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt   DateTime? @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+  deletedAt   DateTime? @db.Timestamptz()
   isDeleted   Boolean  @default(false)
 
   product           Product           @relation(fields: [productId], references: [id])
@@ -167,7 +167,7 @@ model StockMovimentStore {
   id              Int      @id @default(autoincrement())
   stockMovimentId Int
   storeId         Int
-  deletedAt       DateTime?
+  deletedAt       DateTime? @db.Timestamptz()
   isDeleted       Boolean  @default(false)
 
   stockMoviment StockMoviment @relation(fields: [stockMovimentId], references: [id])
@@ -184,7 +184,7 @@ model AuditLog {
   ipAddress   String?
   userAgent   String?
   isOwner     Boolean?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz()
 
   user      User?      @relation(fields: [userId], references: [id])
   storeUser StoreUser? @relation(fields: [storeUserId], references: [id])
