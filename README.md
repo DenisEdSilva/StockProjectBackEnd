@@ -24,7 +24,7 @@ API para gestão de lojas, estoque, produtos, usuários e auditoria.
 
 ---
 
-## 🛠Tecnologias
+## 🛠 Tecnologias
 - **Node.js** & **Express**  
 - **Prisma** (PostgreSQL)  
 - **JWT** (Autenticação)  
