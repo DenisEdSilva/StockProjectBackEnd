@@ -59,6 +59,7 @@ npx prisma db seed
 # Inicie o servidor
 npm run dev
 
+```
 ---
 
 ## 🔧 Variáveis de Ambiente {#variaveis-de-ambiente}
