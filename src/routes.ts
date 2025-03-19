@@ -34,7 +34,6 @@ import { ListStoreUserController } from "./controllers/storeUser/ListStoreUserCo
 import { UpdateStoreUserController } from "./controllers/storeUser/UpdateStoreUserController";
 import { AuthStoreUserController } from "./controllers/storeUser/AuthStoreUserController";
 import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUserController";
-import { CreateStoreUserAccessControlListController } from "./controllers/storeUser/CreateStoreUserAccessControlListController";
 
 // CATEGORY CONTROLLERS
 import { CreateCategoryController } from "./controllers/category/CreateCategoryController";
