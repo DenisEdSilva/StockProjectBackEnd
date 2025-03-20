@@ -37,6 +37,9 @@ class ListStoreService {
                             storeUsers: true
                         }
                     }
+                },
+		        orderBy: {
+                    name: 'asc'
                 }
             });
         });

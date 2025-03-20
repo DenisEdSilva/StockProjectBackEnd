@@ -18,9 +18,10 @@ import { AuthUserController } from "./controllers/user/AuthUserController";
 // STORE CONTROLLERS
 import { CreateStoreController } from "./controllers/store/CreateStoreController";
 import { ListStoreController } from "./controllers/store/ListStoreController";
+import { GetStoreByIdController } from "./controllers/store/GetStoreByIdController";
 import { UpdateStoreController } from "./controllers/store/UpdateStoreController";
-import { DeleteStoreController } from "./controllers/store/DeleteStoreController";
 import { RevertDeleteStoreController } from "./controllers/store/RevertDeleteStoreController";
+import { DeleteStoreController } from "./controllers/store/DeleteStoreController";
 
 // ROLE CONTROLLERS
 import { CreateRoleController } from "./controllers/role/CreateRoleController";
@@ -122,11 +123,27 @@ router.get("/stores",
   }
 );
 
+router.get("/stores/store/:storeId",
+  authenticated,
+  authorized("GET", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetStoreByIdController().handle(req, res, next);
+  }
+);
+
 router.put("/stores/:storeId",
   authenticated,
   authorized("PUT", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
     new UpdateStoreController().handle(req, res, next);
+  }
+);
+
+router.put("/stores/:storeId/revert",
+  authenticated,
+  authorized("PUT", "STORE_DELETE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new RevertDeleteStoreController().handle(req, res, next);
   }
 );
 
@@ -138,13 +155,6 @@ router.delete("/stores/:storeId",
   }
 );
 
-router.put("/stores/:storeId/revert",
-  authenticated,
-  authorized("PUT", "STORE_DELETE"),
-  (req: Request, res: Response, next: NextFunction) => {
-    new RevertDeleteStoreController().handle(req, res, next);
-  }
-);
 
 // ROLE ROUTES
 router.post("/stores/:storeId/roles/",
