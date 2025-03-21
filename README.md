@@ -52,7 +52,7 @@ npm install
 
 # Execute as migrações e seeds do Prisma
 npx prisma migrate dev
-npx prisma db seed
+npm run seed
 
 # Inicie o servidor
 npm run dev
