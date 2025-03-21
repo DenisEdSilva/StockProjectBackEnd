@@ -4,8 +4,7 @@ import { ListStoreUserService } from "../../services/storeUser/ListStoreUserServ
 class ListStoreUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const storeId = parseInt(req.params.storeId, 10);
-            const userId = req.userId;
+            const userId = req.user.id;
     
             const service = new ListStoreUserService();
             const result = await service.execute(userId);

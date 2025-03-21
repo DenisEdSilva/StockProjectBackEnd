@@ -1,9 +1,9 @@
 import prismaClient from "../../prisma";
 import { compare } from "bcryptjs";
 import { sign } from "jsonwebtoken";
+import { redisClient } from "../../redis.config";
 import { 
-    ValidationError, 
-    NotFoundError, 
+    ValidationError,
     UnauthorizedError 
 } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
@@ -59,7 +59,7 @@ class AuthStoreUserService {
             if (!passwordValid) throw new UnauthorizedError("Invalid credentials");
 
             const token = sign(
-                { sub: storeUser.id, storeId: storeUser.storeId, role: storeUser.roleId },
+                { sub: storeUser.id, type: 'store', storeId: storeUser.storeId},
                 process.env.JWT_SECRET!,
                 { expiresIn: "8h" }
             );
@@ -68,6 +68,20 @@ class AuthStoreUserService {
                 action: rp.permission.action,
                 resource: rp.permission.resource
             })) || [];
+
+            const redisData = {
+                id: storeUser.id,
+                storeId: storeUser.storeId,
+                permissions: storeUser?.role.rolePermissions.map(p=> p.permission) || []
+            }
+
+            console.log(redisData)
+
+            await redisClient.setEx(
+                `store:${storeUser.storeId}:user:${storeUser.id}`,
+                3600 * 8,
+                JSON.stringify(redisData)
+            )
 
             await activityTracker.track({
                 tx,

@@ -5,7 +5,7 @@ class CreateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { banner, name, stock, price, description } = req.body;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
             const { categoryId, storeId } = req.params;
     
             const service = new CreateProductService();

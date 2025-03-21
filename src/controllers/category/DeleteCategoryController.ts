@@ -5,7 +5,7 @@ class DeleteCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId, categoryId } = req.params;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
     
             const service = new DeleteCategoryService();
             const result = await service.execute({

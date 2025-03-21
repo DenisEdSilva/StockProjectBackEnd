@@ -4,8 +4,8 @@ import { UpdateRoleService } from "../../services/role/UpdateRoleService";
 class UpdateRoleController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
+            const performedByUserId = req.user.id;
             const { storeId, roleId } = req.params;
-            const performedByUserId = req.userId;
             const { name, permissionIds } = req.body;
     
             const updateRoleService = new UpdateRoleService();

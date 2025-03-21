@@ -5,7 +5,7 @@ class RevertDeleteStoreController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId } = req.params;
-            const userId = req.userId;
+            const userId = req.user.id;
     
             const revertService = new RevertDeleteStoreService();
             const result = await revertService.execute({

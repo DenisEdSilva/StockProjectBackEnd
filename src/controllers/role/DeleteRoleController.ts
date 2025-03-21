@@ -5,7 +5,7 @@ class DeleteRoleController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeid ,roleId } = req.params;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
     
             const deleteRoleService = new DeleteRoleService();
             const result = await deleteRoleService.execute({ 

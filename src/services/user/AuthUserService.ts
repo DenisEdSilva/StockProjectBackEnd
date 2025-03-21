@@ -67,9 +67,7 @@ class AuthUserService {
         const token = sign(
             { 
                 id: user.id, 
-                name: user.name, 
-                email: user.email, 
-                isOwner: user.isOwner 
+                type: 'owner',
             },
             process.env.JWT_SECRET!,
             { 

@@ -2,6 +2,7 @@ import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError } from "../../errors";
 
 interface AuditLogRequest {
+    requestUserId: number;
     startDate?: Date;
     endDate?: Date;
     userId?: number;
@@ -13,6 +14,11 @@ interface AuditLogRequest {
 class AuditLogService {
     async execute(filters: AuditLogRequest) {
         return await prismaClient.$transaction(async (tx) => {
+
+            if (filters.requestUserId !== 1) {
+                throw new ValidationError("Usuário não autorizado");
+            }
+
             this.validateDates(filters.startDate, filters.endDate);
             const page = filters.page || 1;
             const limit = filters.limit || 25;

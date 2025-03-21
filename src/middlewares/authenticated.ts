@@ -1,20 +1,21 @@
+// authenticated.ts
 import { NextFunction, Request, Response } from "express";
 import { verify } from "jsonwebtoken";
+import { redisClient } from "../redis.config";
 import { UnauthorizedError, ValidationError } from "../errors";
 
 declare module "express" {
     interface Request {
-        userId: number;
-        token: string;
+        user: {
+            id: number;
+            type: 'owner' | 'store';
+            permissions?: string[];
+            storeId?: number;
+        };
     }
 }
 
-interface JwtPayload {
-    sub: string;
-    [key: string]: any;
-}
-
-export function authenticated(req: Request, res: Response, next: NextFunction): void {
+export async function authenticated(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const authHeader = req.headers.authorization;
 
@@ -23,23 +24,47 @@ export function authenticated(req: Request, res: Response, next: NextFunction): 
         }
 
         const token = authHeader.split(" ")[1];
+        const decoded = verify(token, process.env.JWT_SECRET!) as {
+            id: number;
+            type: 'owner' | 'store';
+            storeId?: number;
+        };
 
-        const decoded = verify(token, process.env.JWT_SECRET!) as JwtPayload;
-
-        const userId = decoded.id;
-
-        if (isNaN(userId)) {
-            throw new ValidationError("ID de usuário inválido no token");
+        if(!['owner', 'store'].includes(decoded.type)) {
+            throw new UnauthorizedError("Tipo de usuário inválido no token");
         }
 
-        req.userId = userId;
-        req.token = token;
+        const redisKey = decoded.type === 'owner'
+            ? `owner:${decoded.id}`
+            : `store:${decoded.storeId}:user:${decoded.id}`;
+
+        const userData = await redisClient.get(redisKey);
+        
+        if (!userData) {
+            throw new UnauthorizedError("Sessão expirada ou inválida");
+        }
+
+        const user = JSON.parse(userData);
+
+        req.user = {
+            id: decoded.id,
+            type: decoded.type,
+            ...(decoded.type === 'store' && {
+                storeId: decoded.storeId,
+                permissions: user.permissions || []
+            })
+        };
 
         next();
     } catch (error) {
         if (error instanceof Error) {
-            if (["TokenExpiredError", "JsonWebTokenError", "NotBeforeError"].includes(error.name)) {
-                throw new UnauthorizedError(`Token inválido: ${error.message}`);
+            switch (error.name) {
+                case 'TokenExpiredError':
+                    return next(new UnauthorizedError("Sessão expirada"));
+                case 'JsonWebTokenError':
+                    return next(new UnauthorizedError("Token inválido"));
+                default:
+                    return next(error);
             }
         }
         next(error);

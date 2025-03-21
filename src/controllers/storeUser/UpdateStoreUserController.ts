@@ -6,7 +6,7 @@ class UpdateStoreUserController {
         try {
             const { name, email, password, roleId } = req.body;
             const { storeId, storeUserId } = req.params;
-            const updatedBy = req.userId;
+            const updatedBy = req.user.id;
     
             const service = new UpdateStoreUserService();
             const result = await service.execute({

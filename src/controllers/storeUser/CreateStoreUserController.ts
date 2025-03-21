@@ -4,7 +4,7 @@ import { CreateStoreUserService } from "../../services/storeUser/CreateStoreUser
 class CreateStoreUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
             const { name, email, password, roleId } = req.body;
             const storeId = parseInt(req.params.storeId, 10);
 

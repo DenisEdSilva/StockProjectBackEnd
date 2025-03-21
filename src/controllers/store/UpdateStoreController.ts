@@ -6,8 +6,8 @@ class UpdateStoreController {
         try {
             const { storeId } = req.params;
             const { name, city, state, zipCode } = req.body;
-            const userId = req.userId;
-            const performedByUserId = req.userId;
+            const userId = req.user.id;
+            const performedByUserId = req.user.id;
     
             const updateStoreService = new UpdateStoreService();
             const result = await updateStoreService.execute({

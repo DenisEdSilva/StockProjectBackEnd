@@ -4,7 +4,7 @@ import { DetailUserService } from "../../services/user/DetailUserService";
 class DetailUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const userId = req.userId;
+            const userId = req.user.id;
 
             const detailUserService = new DetailUserService();
             const user = await detailUserService.execute({

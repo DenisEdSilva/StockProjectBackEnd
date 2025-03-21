@@ -6,8 +6,7 @@ class CreateRoleController {
         try {
             const { name, permissionIds } = req.body;
             const storeId = parseInt(req.params.storeId, 10);
-            const userId = req.userId;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
             
             const createRoleService = new CreateRoleService();
             const role = await createRoleService.execute({ 

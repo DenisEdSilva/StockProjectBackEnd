@@ -4,7 +4,7 @@ import { GetStoreByIdService } from "../../services/store/GetStoreByIdService";
 class GetStoreByIdController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const ownerId = req.userId;
+            const ownerId = req.user.id;
             const storeId = Number(req.params.storeId);
 
             const service = new GetStoreByIdService();

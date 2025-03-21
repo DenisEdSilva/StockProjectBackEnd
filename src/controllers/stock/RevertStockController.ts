@@ -5,7 +5,7 @@ class RevertStockController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { movementId, storeId, productId } = req.params;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
     
             const service = new RevertStockService();
             const result = await service.execute({

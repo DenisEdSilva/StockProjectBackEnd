@@ -4,7 +4,7 @@ import { UpdateProductService } from "../../services/products/UpdateProductServi
 class UpdateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
             const { storeId, productId, categoryId } = req.params;
             const { name, price, description } = req.body;
     

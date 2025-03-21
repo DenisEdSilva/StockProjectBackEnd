@@ -5,7 +5,7 @@ class DeleteStoreUserController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId, storeUserId } = req.params;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
     
             const service = new DeleteStoreUserService();
             const result = await service.execute({

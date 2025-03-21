@@ -5,8 +5,8 @@ class CreateStoreController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { name, city, state, zipCode } = req.body;
-            const ownerId = req.userId;
-            const performedByUserId = req.userId;
+            const ownerId = req.user.id;
+            const performedByUserId = req.user.id;
     
             const createStoreService = new CreateStoreService();
             const store = await createStoreService.execute({

@@ -6,7 +6,7 @@ class CreateStockController {
         try {
             const { type, stock } = req.body;
             const { storeId, productId } = req.params;
-            const performedByUserId = req.userId;
+            const performedByUserId = req.user.id;
     
             const service = new CreateStockService();
             const result = await service.execute({

@@ -6,7 +6,7 @@ class CreateCategoryController {
         try {
             const { name } = req.body;
             const storeId = parseInt(req.params.storeId, 10);
-            const userId = req.userId;
+            const userId = req.user.id;
             
     
             const service = new CreateCategoryService();
