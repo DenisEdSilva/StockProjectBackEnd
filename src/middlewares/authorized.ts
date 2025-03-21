@@ -23,7 +23,7 @@ export function authorized(action: string, resource: string) {
 
             const requiredPermission = `${action.toUpperCase()}_${resource.toUpperCase()}`;
             const hasPermission = (req.user.permissions?.some(p => 
-                `${p.toUpperCase()}_${p.toUpperCase()}` === requiredPermission
+                `${action.toUpperCase()}_${resource.toUpperCase()}` === requiredPermission
             ) || []);
 
             if (!hasPermission) {
