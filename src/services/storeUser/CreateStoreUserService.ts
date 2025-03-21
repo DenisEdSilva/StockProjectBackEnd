@@ -64,14 +64,13 @@ class CreateStoreUserService {
                 }
             });
 
-            const acl = await aclService.execute({ storeUserId: user.id });
+            const acl = await aclService.execute({ storeUserId: user.id }, tx);
 
             await redisClient.setEx(
                 `acl:${user.id}`,
                 28800,
                 JSON.stringify(acl)
             );
-    
 
             await activityTracker.track({
                 tx,

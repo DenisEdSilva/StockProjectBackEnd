@@ -97,7 +97,7 @@ class UpdateStoreUserService {
                 }
             });
 
-            const acl = await aclService.execute({ storeUserId: data.id });
+            const acl = await aclService.execute({ storeUserId: data.id }, tx);
 
             await redisClient.setEx(
                 `acl:${data.id}`,
