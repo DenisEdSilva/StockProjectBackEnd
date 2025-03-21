@@ -286,7 +286,7 @@ router.put("/stores/:storeId/categories/:categoryId/products/:productId",
   }
 );
 
-router.delete("/stores/:storeId/categories:categoryId/products/:productId",
+router.delete("/stores/:storeId/categories/:categoryId/products/:productId",
   authenticated,
   authorized("DELETE", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
