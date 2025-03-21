@@ -123,7 +123,7 @@ router.get("/stores",
   }
 );
 
-router.get("/stores/store/:storeId",
+router.get("/stores/:storeId",
   authenticated,
   authorized("GET", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {

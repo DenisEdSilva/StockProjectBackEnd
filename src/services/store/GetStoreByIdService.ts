@@ -15,8 +15,25 @@ class GetStoreByIdService {
 
             const store = await tx.store.findUnique({
                 where: { 
-                    id: data.storeId 
+                    id: data.storeId,
+                    ownerId: data.ownerId
                 },
+                select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    state: true,
+                    zipCode: true,
+                    createdAt: true,
+                    ownerId: true,
+                    _count: {
+                        select: {
+                            products: true,
+                            categories: true,
+                            storeUsers: true
+                        }
+                    }
+                }
             })
 
             if (!store) {
