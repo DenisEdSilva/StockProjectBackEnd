@@ -17,21 +17,27 @@ class AuthStoreUserController {
                 userAgent: req.headers['user-agent'] || ''
             });
 
-            await redisClient.setEx(
-                `storeUser:${authResult.id}`,
-                28800,
-                JSON.stringify({
-                    ...authResult,
-                    isOwner: false
-                })
-            );
+            res.cookie("access_token", authResult.token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 8 * 3600 * 1000,
+                path: "/",
+            });
 
-            return res.status(200).json({
-                token: authResult.token,
+            return res.json({
                 user: {
+                    token: authResult.token,
                     id: authResult.id,
                     name: authResult.name,
-                    email: authResult.email
+                    email: authResult.email,
+                    storeId: authResult.storeId,
+                    roleId: authResult.roleId,
+                    createdBy: authResult.createdBy,
+                    createdAt: authResult.createdAt,
+                    updatedAt: authResult.updatedAt,
+                    deletedAt: authResult.deletedAt,
+                    isDeleted: authResult.isDeleted,
                 },
                 permissions: authResult.permissions
             });

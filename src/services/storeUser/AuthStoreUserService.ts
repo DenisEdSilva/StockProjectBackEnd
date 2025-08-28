@@ -17,14 +17,19 @@ interface AuthRequest {
     userAgent: string;
 }
 
-interface AuthResponse {
+interface AuthResponse{
     id: number;
     name: string;
     email: string;
     roleId: number;
     storeId: number;
-    token: string;
     permissions: Array<{ action: string; resource: string }>;
+    createdBy: number;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+    isDeleted: boolean;
+    token: string;
 }
 
 class AuthStoreUserService {
@@ -43,9 +48,9 @@ class AuthStoreUserService {
                 include: {
                     role: {
                         include: {
-                            rolePermissions: {
-                                include: {
-                                    permission: true
+                            permissions: {
+                                include: { 
+                                    permission: true 
                                 }
                             }
                         }
@@ -57,31 +62,33 @@ class AuthStoreUserService {
             
             const passwordValid = await compare(data.password, storeUser.password);
             if (!passwordValid) throw new UnauthorizedError("Invalid credentials");
-
-            const token = sign(
-                { sub: storeUser.id, type: 'store', storeId: storeUser.storeId},
-                process.env.JWT_SECRET!,
-                { expiresIn: "8h" }
-            );
-
-            const permissions = storeUser.role?.rolePermissions.map(rp => ({
+            
+            const permissions = storeUser.role.permissions.map(rp => ({
                 action: rp.permission.action,
                 resource: rp.permission.resource
             })) || [];
 
-            const redisData = {
-                id: storeUser.id,
-                storeId: storeUser.storeId,
-                permissions: storeUser?.role.rolePermissions.map(p=> p.permission) || []
-            }
-
-            console.log(redisData)
+            const token = sign(
+                { 
+                    id: storeUser.id, 
+                    type: 'store',
+                    storeId: storeUser.storeId
+                },
+                process.env.JWT_SECRET!,
+                { 
+                    expiresIn: "8h" 
+                }
+            );
 
             await redisClient.setEx(
                 `store:${storeUser.storeId}:user:${storeUser.id}`,
-                3600 * 8,
-                JSON.stringify(redisData)
-            )
+                8 * 3600,
+                JSON.stringify({
+                    id: storeUser.id,
+                    storeId: storeUser.storeId,
+                    permissions: permissions
+                })
+            );
 
             await activityTracker.track({
                 tx,
@@ -104,10 +111,15 @@ class AuthStoreUserService {
                 id: storeUser.id,
                 name: storeUser.name,
                 email: storeUser.email,
-                token,
                 roleId: storeUser.roleId,
                 storeId: storeUser.storeId,
-                permissions
+                createdBy: storeUser.createdBy,
+                createdAt: storeUser.createdAt,
+                updatedAt: storeUser.updatedAt,
+                deletedAt: storeUser.deletedAt,
+                isDeleted: storeUser.isDeleted,
+                permissions,
+                token
             };
         }, {
             maxWait: 15000,

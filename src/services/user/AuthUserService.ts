@@ -8,6 +8,7 @@ import {
     UnauthorizedError, 
     ForbiddenError 
 } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface AuthRequest {
     email: string;
@@ -15,10 +16,21 @@ interface AuthRequest {
     ipAddress: string;
     userAgent: string;
 }
-import { CreateAuditLogService } from "../audit/CreateAuditLogService";
+
+interface AuthResponse {
+    id: number;
+    name: string;
+    email: string;
+    isOwner: boolean;
+    ownedStores: Array<{ id: number; name: string }> | null;
+    token: string;
+    createdAt: Date;
+    updatedAt: Date;
+    lastActivityAt: Date | null;
+}
 
 class AuthUserService {
-    async execute({ email, password, ipAddress, userAgent }: AuthRequest) {
+    async execute({ email, password, ipAddress, userAgent }: AuthRequest): Promise<AuthResponse> {
         const auditLogService = new CreateAuditLogService();
         if (!this.isValidEmail(email)) {
             throw new ValidationError("Formato de email inválido");
@@ -40,7 +52,8 @@ class AuthUserService {
                         },
                         categories: true,
                         products: true,
-                        StockMoviment: true
+                        stockMovimentsOrigin: true,
+                        stockMovimentsDestination: true
                     }
                 } 
             }
@@ -67,7 +80,7 @@ class AuthUserService {
         const token = sign(
             { 
                 id: user.id, 
-                type: 'owner',
+                type: 'owner'
             },
             process.env.JWT_SECRET!,
             { 
@@ -75,13 +88,15 @@ class AuthUserService {
             }
         );
 
-        await redisClient.set(`user:${user.id}`, JSON.stringify({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            isOwner: user.isOwner,
-            permissions: []
-        }));
+        await redisClient.setEx(
+            `owner:${user.id}`,
+            30 * 24 * 3600,
+            JSON.stringify({
+                id: user.id,
+                name: user.name,
+                email: user.email
+            })
+        );
 
         await Promise.all([
             prismaClient.user.update({
@@ -109,9 +124,15 @@ class AuthUserService {
         });
 
         return { 
-            token,
-            ...user,
-            stores: user.ownedStores
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isOwner: user.isOwner,
+            ownedStores: user.ownedStores,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            lastActivityAt: user.lastActivityAt,
+            token
         };
     }
 

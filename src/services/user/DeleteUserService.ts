@@ -19,7 +19,8 @@ class DeleteUserService {
                         include: {
                             categories: true,
                             products: true,
-                            StockMoviment: true,
+                            stockMovimentsOrigin: true,
+                            stockMovimentsDestination: true,
                             StockMovimentStore: true
                         }
                     }

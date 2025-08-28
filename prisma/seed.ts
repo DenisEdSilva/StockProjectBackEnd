@@ -4,49 +4,43 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const permissions = [
-    // Rotas de USER
-    { action: 'GET', resource: 'USER', name: 'USER:GET' },
-    { action: 'PUT', resource: 'USER', name: 'USER:PUT' },
-    { action: 'DELETE', resource: 'USER', name: 'USER:DELETE' },
-
     // Rotas de STORE
-    { action: 'POST', resource: 'STORE', name: 'STORE:POST' },
-    { action: 'GET', resource: 'STORE', name: 'STORE:GET' },
-    { action: 'PUT', resource: 'STORE', name: 'STORE:PUT' },
-    { action: 'DELETE', resource: 'STORE', name: 'STORE:DELETE' },
-    { action: 'PUT', resource: 'STORE_DELETE', name: 'STORE_DELETE:PUT' },
+    { action: 'POST', resource: 'STORE', name: 'LOJA - CRIAR' },
+    { action: 'GET', resource: 'STORE', name: 'LOJA - BUSCAR' },
+    { action: 'PUT', resource: 'STORE', name: 'LOJA - VISUALIZAR' },
+    { action: 'DELETE', resource: 'STORE', name: 'LOJA - DELETAR' },
 
     // Rotas de ROLE
-    {action: 'POST', resource: 'ROLE', name: 'ROLE:POST'},
-    {action: 'GET', resource: 'ROLE', name: 'ROLE:GET'},
-    {action: 'PUT', resource: 'ROLE', name: 'ROLE:PUT'},
-    {action: 'DELETE', resource: 'ROLE', name: 'ROLE:DELETE'},
+    {action: 'POST', resource: 'ROLE', name: 'CARGO - CRIAR'},
+    {action: 'GET', resource: 'ROLE', name: 'CARGO - BUSCAR'},
+    {action: 'PUT', resource: 'ROLE', name: 'CARGO - VISUALIZAR'},
+    {action: 'DELETE', resource: 'ROLE', name: 'CARGO - DELETAR'},
 
     // Rotas de STORE_USER
-    {action: 'POST', resource: 'STORE_USER', name: 'STORE_USER:POST'},
-    {action: 'GET', resource: 'STORE_USER', name: 'STORE_USER:GET'},
-    {action: 'PUT', resource: 'STORE_USER', name: 'STORE_USER:PUT'},
-    {action: 'DELETE', resource: 'STORE_USER', name: 'STORE_USER:DELETE'},
+    {action: 'POST', resource: 'STORE_USER', name: 'USUÁRIO - CRIAR'},
+    {action: 'GET', resource: 'STORE_USER', name: 'USUÁRIO - BUSCAR'},
+    {action: 'PUT', resource: 'STORE_USER', name: 'USUÁRIO - VISUALIZAR'},
+    {action: 'DELETE', resource: 'STORE_USER', name: 'USUÁRIO - DELETAR'},
 
     // Rotas de CATEGORY
-    {action: 'POST', resource: 'CATEGORY', name: 'CATEGORY:POST'},
-    {action: 'GET', resource: 'CATEGORY', name: 'CATEGORY:GET'},
-    {action: 'PUT', resource: 'CATEGORY', name: 'CATEGORY:PUT'},
-    {action: 'DELETE', resource: 'CATEGORY', name: 'CATEGORY:DELETE'},
+    {action: 'POST', resource: 'CATEGORY', name: 'CATEGORIA - CRIAR'},
+    {action: 'GET', resource: 'CATEGORY', name: 'CATEGORIA - BUSCAR'},
+    {action: 'PUT', resource: 'CATEGORY', name: 'CATEGORIA - VISUALIZAR'},
+    {action: 'DELETE', resource: 'CATEGORY', name: 'CATEGORIA - DELETAR'},
 
     // Rotas de PRODUCT
-    {action: 'POST', resource: 'PRODUCT', name: 'PRODUCT:POST'},
-    {action: 'GET', resource: 'PRODUCT', name: 'PRODUCT:GET'},
-    {action: 'PUT', resource: 'PRODUCT', name: 'PRODUCT:PUT'},
-    {action: 'DELETE', resource: 'PRODUCT', name: 'PRODUCT:DELETE'},
+    {action: 'POST', resource: 'PRODUCT', name: 'PRODUTO - CRIAR'},
+    {action: 'GET', resource: 'PRODUCT', name: 'PRODUTO - BUSCAR'},
+    {action: 'PUT', resource: 'PRODUCT', name: 'PRODUTO - VISUALIZAR'},
+    {action: 'DELETE', resource: 'PRODUCT', name: 'PRODUTO - DELETAR'},
 
     // Rotas de STOCK
-    {action: 'POST', resource: 'STOCK', name: 'STOCK:POST'},
-    {action: 'GET', resource: 'STOCK', name: 'STOCK:GET'},
+    {action: 'POST', resource: 'STOCK', name: 'MOVIMENTAÇÃO - CRIAR'},
+    {action: 'GET', resource: 'STOCK', name: 'MOVIMENTAÇÃO - BUSCAR'},
+    {action: 'PATCH', resource: 'STOCK', name: 'MOVIMENTAÇÃO - REVERTER'},
 
     // Rota de AUDIT_LOG
-    {action: 'GET', resource: 'AUDIT_LOG', name: 'AUDIT_LOG:GET'}
-
+    {action: 'GET', resource: 'AUDIT_LOG', name: 'REGISTRO - BUSCAR'},
 ];
 
 async function main() {

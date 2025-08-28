@@ -27,7 +27,7 @@ class CreateRoleService {
             const roleExists = await tx.role.findFirst({ 
                 where: { name, storeId, isDeleted: false } 
             });
-            if (roleExists) throw new ConflictError("Perfil já existe nesta loja");
+            if (roleExists) throw new ConflictError("Cargo já existe nesta loja");
 
             const validPermissions = await tx.permission.count({ 
                 where: { id: { in: permissionIds } } 
@@ -65,10 +65,9 @@ class CreateRoleService {
                 userAgent: userAgent
             })
 
-
             return await tx.role.findUnique({
                 where: { id: newRole.id },
-                include: { rolePermissions: { include: { permission: true } } }
+                include: { permissions: { include: { permission: true } } }
             });
         });
     }

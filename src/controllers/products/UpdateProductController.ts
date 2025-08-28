@@ -5,17 +5,18 @@ class UpdateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const performedByUserId = req.user.id;
-            const { storeId, productId, categoryId } = req.params;
-            const { name, price, description } = req.body;
+            const { storeId, productId} = req.params;
+            const { name, price, description, categoryId, sku } = req.body;
     
             const service = new UpdateProductService();
             const product = await service.execute({
-                categoryId: parseInt(categoryId, 10),
                 productId: parseInt(productId, 10),
                 storeId: parseInt(storeId, 10),
                 name,
                 price,
                 description,
+                categoryId,
+                sku,
                 performedByUserId,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string

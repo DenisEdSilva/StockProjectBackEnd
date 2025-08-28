@@ -8,6 +8,7 @@ interface UpdateProductRequest {
     storeId: number;
     categoryId?: number;
     productId: number;
+    sku?: string;
     name?: string;
     price?: string;
     description?: string;
@@ -31,24 +32,30 @@ class UpdateProductService {
                 } 
             });
 
+            if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+
+            const store = await tx.store.findUnique({ where: { id: data.storeId, isDeleted: false } });
+
+            if (!store) throw new NotFoundError("Loja nao encontrada");
+
             if (!data.productId || isNaN(data.productId)) throw new ValidationError("ID do produto inválido");
 
             const product = await tx.product.findUnique({ where: { id: data.productId } });
             if (!product) throw new NotFoundError("Produto não encontrado");
             if (product.isDeleted) throw new ConflictError("Produto excluído");
 
-            if (data.categoryId) {
-                const category = await tx.category.findUnique({ where: { id: data.categoryId } });
-                if (!category) throw new NotFoundError("Categoria não existe");
-            }
-
             const updatedProduct = await tx.product.update({
-                where: { id: data.productId },
+                where: { 
+                    id: data.productId,
+                    storeId: data.storeId,
+                    isDeleted: false
+                },
                 data: { 
                     name: data.name,
                     price: data.price,
                     description: data.description,
-                    categoryId: data.categoryId
+                    categoryId: data.categoryId,
+                    sku: data.sku
                 },
                 select: { id: true, name: true, price: true, stock: true }
             });

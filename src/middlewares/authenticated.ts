@@ -1,8 +1,8 @@
-// authenticated.ts
 import { NextFunction, Request, Response } from "express";
 import { verify } from "jsonwebtoken";
 import { redisClient } from "../redis.config";
 import { UnauthorizedError, ValidationError } from "../errors";
+import cookie from "cookie-parser";
 
 declare module "express" {
     interface Request {
@@ -17,24 +17,23 @@ declare module "express" {
 
 export async function authenticated(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const authHeader = req.headers.authorization;
+        const token = req.cookies.access_token;
 
-        if (!authHeader?.startsWith("Bearer ")) {
-            throw new ValidationError("Formato de autorização inválido. Use: Bearer <token>");
+        if (!token) {
+            throw new ValidationError("Token não encontrado nos cookies");
         }
 
-        const token = authHeader.split(" ")[1];
         const decoded = verify(token, process.env.JWT_SECRET!) as {
             id: number;
             type: 'owner' | 'store';
             storeId?: number;
         };
 
-        if(!['owner', 'store'].includes(decoded.type)) {
-            throw new UnauthorizedError("Tipo de usuário inválido no token");
+        if (!['owner', 'store'].includes(decoded.type)) {
+            throw new UnauthorizedError("Tipo de usuário inválido");
         }
 
-        const redisKey = decoded.type === 'owner'
+        const redisKey = decoded.type === 'owner' 
             ? `owner:${decoded.id}`
             : `store:${decoded.storeId}:user:${decoded.id}`;
 
@@ -45,7 +44,6 @@ export async function authenticated(req: Request, res: Response, next: NextFunct
         }
 
         const user = JSON.parse(userData);
-
         req.user = {
             id: decoded.id,
             type: decoded.type,

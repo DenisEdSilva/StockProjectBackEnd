@@ -4,8 +4,8 @@ import { CreateStockService } from "../../services/stock/CreateStockService";
 class CreateStockController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { type, stock } = req.body;
-            const { storeId, productId } = req.params;
+            const { type, stock, productId, destinationStoreId } = req.body;
+            const { storeId } = req.params;
             const performedByUserId = req.user.id;
     
             const service = new CreateStockService();
@@ -14,7 +14,8 @@ class CreateStockController {
                 storeId: parseInt(storeId, 10),
                 productId: parseInt(productId, 10),
                 type,
-                stock,
+                destinationStoreId: destinationStoreId ? parseInt(destinationStoreId, 10) : undefined,
+                stock: parseInt(stock, 10),
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] as string
             });

@@ -27,7 +27,7 @@ class UpdateRoleService {
 
             const role = await tx.role.findUnique({ 
                 where: { id: roleId },
-                include: { rolePermissions: true }
+                include: { permissions: true }
             });
 
             if (!role) throw new NotFoundError("Perfil não encontrado");
@@ -50,7 +50,7 @@ class UpdateRoleService {
                 } 
             });
 
-            const currentPermissionIds = role.rolePermissions.map(rp => rp.permissionId);
+            const currentPermissionIds = role.permissions.map(rp => rp.permissionId);
             const numericPermissionIds = permissionIds.map(Number);
 
             const toAdd = numericPermissionIds.filter(id => !currentPermissionIds.includes(id));
@@ -108,7 +108,7 @@ class UpdateRoleService {
                     id: roleId 
                 },
                 include: { 
-                    rolePermissions: { 
+                    permissions: { 
                         include: { 
                             permission: true 
                         } 

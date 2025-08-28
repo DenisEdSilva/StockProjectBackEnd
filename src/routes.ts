@@ -7,10 +7,15 @@ interface RequestWithToken extends Request {
 
 // PERMISSION CONTROLLERS
 import { CreatePermissionController } from "./controllers/permission/CreatePermissionController";
+import { ListPermissionController } from "./controllers/permission/ListPermissionController";
+
+// AUTH CONTROLLERS
+import { SignInController } from "./controllers/auth/SignInController";
 
 // USER CONTROLLERS
 import { CreateUserController } from "./controllers/user/CreateUserController";
 import { DetailUserController } from "./controllers/user/DetailUserController";
+import { GetOwnerByIdController } from "./controllers/user/GetOwnerByIdController";
 import { UpdateUserController } from "./controllers/user/UpdateUserController";
 import { DeleteUserController } from "./controllers/user/DeleteUserController";
 import { AuthUserController } from "./controllers/user/AuthUserController";
@@ -19,6 +24,8 @@ import { AuthUserController } from "./controllers/user/AuthUserController";
 import { CreateStoreController } from "./controllers/store/CreateStoreController";
 import { ListStoreController } from "./controllers/store/ListStoreController";
 import { GetStoreByIdController } from "./controllers/store/GetStoreByIdController";
+import { GetStoreUserByIdController } from "./controllers/storeUser/GetStoreUserByIdController";
+import { GetStoreByOwnerController } from "./controllers/store/GetStoreByOwnerController";
 import { UpdateStoreController } from "./controllers/store/UpdateStoreController";
 import { RevertDeleteStoreController } from "./controllers/store/RevertDeleteStoreController";
 import { DeleteStoreController } from "./controllers/store/DeleteStoreController";
@@ -26,6 +33,7 @@ import { DeleteStoreController } from "./controllers/store/DeleteStoreController
 // ROLE CONTROLLERS
 import { CreateRoleController } from "./controllers/role/CreateRoleController";
 import { ListRoleController } from "./controllers/role/ListRoleController";
+import { GetRoleByIdController } from "./controllers/role/GetRoleByIdController";
 import { UpdateRoleController } from "./controllers/role/UpdateRoleController";
 import { DeleteRoleController } from "./controllers/role/DeleteRoleController";
 
@@ -39,12 +47,14 @@ import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUs
 // CATEGORY CONTROLLERS
 import { CreateCategoryController } from "./controllers/category/CreateCategoryController";
 import { ListCategoryController } from "./controllers/category/ListCategoryController";
+import { GetCategoryByIdController } from "./controllers/category/GetCategoryByIdController";
 import { UpdateCategoryController } from "./controllers/category/UpdateCategoryController";
 import { DeleteCategoryController } from "./controllers/category/DeleteCategoryController";
 
 // PRODUCT CONTROLLERS
 import { CreateProductController } from "./controllers/products/CreateProductController";
 import { ListProductController } from "./controllers/products/ListProductController";
+import { GetProductByIdController } from "./controllers/products/GetProductByIdController";
 import { UpdateProductController } from "./controllers/products/UpdateProductController";
 import { DeleteProductController } from "./controllers/products/DeleteProductController";
 
@@ -59,6 +69,7 @@ import { AuditLogController } from "./controllers/audit/AuditLogController";
 // MIDDLEWARES
 import { authenticated } from "./middlewares/authenticated";
 import { authorized } from "./middlewares/authorized";
+import { MeController } from "./controllers/me/MeController";
 
 const router = Router();
 
@@ -66,6 +77,41 @@ const router = Router();
 router.post("/permissions",
   (req: Request, res: Response) => {
     new CreatePermissionController().handle(req, res,);
+  }
+);
+
+router.get("/permissions",
+  (req: Request, res: Response, next: NextFunction) => {
+    new ListPermissionController().handle(req, res, next);
+  }
+);
+
+// BASIC ROUTES
+router.get("/me",
+  authenticated,
+  (req: Request, res: Response, next: NextFunction) => {
+    new MeController().handle(req, res, next);
+  }
+);
+
+router.post('/logout', 
+  authenticated,
+  (req: Request, res: Response) => {
+      res.clearCookie('access_token', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          domain: process.env.NODE_ENV === 'development' ? 'localhost' : undefined
+      });
+      res.json({ success: true });
+  }
+);
+
+// AUTH ROUTES
+router.post("/auth/signIn",
+  (req: Request, res: Response, next: NextFunction) => {
+    new SignInController().handle(req, res, next);
   }
 );
 
@@ -82,25 +128,29 @@ router.post("/sessions",
   }
 );
 
-router.get("/me",
+router.get("/users/me",
   authenticated,
-  authorized("GET", "USER"),
   (req: Request, res: Response, next: NextFunction) => {
     new DetailUserController().handle(req, res, next);
   }
 );
 
-router.put("/me/:userId",
+router.get("/users/:ownerId",
   authenticated,
-  authorized("PUT", "USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetOwnerByIdController().handle(req, res, next);
+  }
+)
+
+router.put("/users/me/:userId",
+  authenticated,
   (req: Request, res: Response, next: NextFunction) => {
     new UpdateUserController().handle(req, res, next);
   }
 );
 
-router.delete("/me/:id",
+router.delete("/users/me/:id",
   authenticated,
-  authorized("DELETE", "USER"),
   (req: Request, res: Response, next: NextFunction) => {
     new DeleteUserController().handle(req, res, next);
   }
@@ -117,9 +167,16 @@ router.post("/stores",
 
 router.get("/stores",
   authenticated,
-  authorized("GET", "STORE"),
   (req: Request, res: Response, next: NextFunction) => {
     new ListStoreController().handle(req, res, next);
+  }
+);
+
+router.get("/stores/by-owner",
+  authenticated,
+  authorized("GET", "STORE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetStoreByOwnerController().handle(req, res, next); 
   }
 );
 
@@ -173,6 +230,13 @@ router.get("/stores/:storeId/roles/",
   }
 );
 
+router.get("/stores/:storeId/roles/:roleId",
+  authenticated,
+  authorized("GET", "ROLE"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetRoleByIdController().handle(req, res, next);
+  })
+
 router.put("/stores/:storeId/roles/:roleId",
   authenticated,
   authorized("PUT", "ROLE"),
@@ -212,6 +276,15 @@ router.get("/stores/:storeId/users",
   }
 );
 
+router.get("/stores/:storeId/users/:storeUserId", 
+  authenticated,
+  authorized("GET", "STORE_USER"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetStoreUserByIdController().handle(req, res, next);
+  }
+);
+
+
 router.put("/stores/:storeId/users/:storeUserId",
   authenticated,
   authorized("PUT", "STORE_USER"),
@@ -245,6 +318,14 @@ router.get("/stores/:storeId/categories",
   }
 );
 
+router.get("/stores/:storeId/categories/:categoryId",
+  authenticated,
+  authorized("GET", "CATEGORY"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetCategoryByIdController().handle(req, res, next);
+  }
+);
+
 router.put("/stores/:storeId/categories/:categoryId",
   authenticated,
   authorized("PUT", "CATEGORY"),
@@ -262,7 +343,7 @@ router.delete("/stores/:storeId/categories/:categoryId",
 );
 
 // PRODUCT ROUTES
-router.post("/stores/:storeId/categories/:categoryId/products",
+router.post("/stores/:storeId/products",
   authenticated,
   authorized("POST", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -270,7 +351,7 @@ router.post("/stores/:storeId/categories/:categoryId/products",
   }
 );
 
-router.get("/stores/:storeId/categories/:categoryId/products",
+router.get("/stores/:storeId/products",
   authenticated,
   authorized("GET", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -278,7 +359,15 @@ router.get("/stores/:storeId/categories/:categoryId/products",
   }
 );
 
-router.put("/stores/:storeId/categories/:categoryId/products/:productId",
+router.get("/stores/:storeId/products/:productId",
+  authenticated,
+  authorized("GET", "PRODUCT"),
+  (req: Request, res: Response, next: NextFunction) => {
+    new GetProductByIdController().handle(req, res, next);
+  }
+);
+
+router.put("/stores/:storeId/products/:productId",
   authenticated,
   authorized("PUT", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -286,7 +375,7 @@ router.put("/stores/:storeId/categories/:categoryId/products/:productId",
   }
 );
 
-router.delete("/stores/:storeId/categories/:categoryId/products/:productId",
+router.delete("/stores/:storeId/products/:productId",
   authenticated,
   authorized("DELETE", "PRODUCT"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -295,7 +384,7 @@ router.delete("/stores/:storeId/categories/:categoryId/products/:productId",
 );
 
 // STOCK ROUTES
-router.post("/stores/:storeId/products/:productId/stocks/movements",
+router.post("/stores/:storeId/stock/movements",
   authenticated,
   authorized("POST", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -303,7 +392,7 @@ router.post("/stores/:storeId/products/:productId/stocks/movements",
   }
 );
 
-router.get("/stores/:storeId/products/:productId/stocks/movements",
+router.get("/stores/:storeId/stock/movements",
   authenticated,
   authorized("GET", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
@@ -311,16 +400,16 @@ router.get("/stores/:storeId/products/:productId/stocks/movements",
   }
 );
 
-router.post("/stores/:storeId/products/:productId/stocks/movements/:movementId/revert",
+router.patch("/stores/:storeId/stock/movements/:movementId/revert",
   authenticated,
-  authorized("POST", "STOCK"),
+  authorized("PATCH", "STOCK"),
   (req: Request, res: Response, next: NextFunction) => {
     new RevertStockController().handle(req, res, next);
   }
 );
 
 // AUDIT ROUTES
-router.get("/audit-logs",
+router.get("/stores/:storeId/auditLogs",
   authenticated,
   authorized("GET", "AUDIT_LOG"),
   (req: Request, res: Response, next: NextFunction) => {

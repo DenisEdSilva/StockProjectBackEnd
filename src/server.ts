@@ -1,16 +1,22 @@
 import express, { Request, Response, NextFunction, ErrorRequestHandler } from "express";
 import "express-async-errors"
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { router } from  "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 app.use(express.json());
 app.use(cors({
-  origin: 'http://localhost:3000', // URL do frontend
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}))
+  origin: process.env.NODE_ENV === "production" 
+        ? "https://seusite.com" 
+        : "http://localhost:3000",
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+app.use(cookieParser());
 
 app.use(router);
 

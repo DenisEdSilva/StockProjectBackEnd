@@ -10,7 +10,7 @@ class UpdateStoreUserController {
     
             const service = new UpdateStoreUserService();
             const result = await service.execute({
-                performedByUserId: updatedBy,
+                performedByUserId: Number(updatedBy),
                 id: Number(storeUserId),
                 storeId: Number(storeId),
                 name,

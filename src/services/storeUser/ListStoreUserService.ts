@@ -1,45 +1,69 @@
 import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError } from "../../errors";
 
-interface StoreUserACLResponse {
-    id: number;
-    name: string;
-    email: string;
-    permissions: Array<{ action: string; resource: string }>;
+interface ListStoreUserRequest {
+    storeId: number;
+    search?: string;
+    page?: number;
+    pageSize?: number;
 }
 
 class ListStoreUserService {
-    async execute(storeUserId: number): Promise<StoreUserACLResponse> {
+    async execute({ storeId, search, page = 1, pageSize = 10 }: ListStoreUserRequest) {
         return await prismaClient.$transaction(async (tx) => {
-            if (!storeUserId || isNaN(storeUserId)) {
-                throw new ValidationError("ID de usuário inválido");
+            if (!storeId || isNaN(storeId)) {
+                throw new ValidationError("ID da loja inválido");
             }
 
-            const storeUser = await tx.storeUser.findUnique({
-                where: { id: storeUserId },
-                include: {
-                    role: {
-                        include: {
-                            rolePermissions: {
-                                include: { permission: true }
+            const store = await tx.store.findUnique({ where: { id: storeId } });
+            if (!store) throw new NotFoundError("Loja não encontrada");
+
+            const whereClause = {
+                storeId,
+                isDeleted: false,
+                ...(search && {
+                    name: {
+                        contains: search,
+                        mode: "insensitive" as const
+                    }
+                })
+            };
+
+            const [storeUsers, total] = await Promise.all([
+                tx.storeUser.findMany({
+                    where: whereClause,
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        storeId: true,
+                        role: {
+                            select: {
+                                name: true
                             }
                         }
-                    }
-                }
-            });
-
-            if (!storeUser) throw new NotFoundError("Usuário não encontrado");
-            if (storeUser.isDeleted) throw new NotFoundError("Usuário desativado");
-            if (!storeUser.role) throw new ValidationError("Perfil não atribuído");
+                    },
+                    orderBy: { name: "asc" },
+                    skip: (page - 1) * pageSize,
+                    take: pageSize
+                }),
+                tx.storeUser.count({ where: whereClause })
+            ]);
 
             return {
-                id: storeUser.id,
-                name: storeUser.name,
-                email: storeUser.email,
-                permissions: storeUser.role.rolePermissions.map(rp => ({
-                    action: rp.permission.action,
-                    resource: rp.permission.resource
-                }))
+                data: storeUsers.map(user => ({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role.name,
+                    storeId: user.storeId
+                })),
+                pagination: {
+                    page,
+                    pageSize,
+                    total,
+                    totalPages: Math.ceil(total / pageSize)
+                }
             };
         });
     }
