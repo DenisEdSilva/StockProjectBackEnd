@@ -2,40 +2,27 @@ import { Request, Response, NextFunction } from "express";
 import { AuditLogService } from "../../services/audit/AuditLogService";
 
 class AuditLogController {
+    constructor(private auditLogService: AuditLogService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { startDate, endDate, userId, storeUserId, action, page, limit } = req.query;
             const { storeId } = req.params;
-            const requestUserId = req.user.id;
-    
-            const service = new AuditLogService();
-            const result = await service.execute(
-                parseInt(storeId as string, 10),
-                {
-                    requestUserId,
-                    startDate: startDate ? new Date(startDate as string) : undefined,
-                    endDate: endDate ? new Date(endDate as string) : undefined,
-                    userId: userId ? parseInt(userId as string, 10) : undefined,
-                    storeUserId: storeUserId ? parseInt(storeUserId as string, 10) : undefined,
-                    action: action as string,
-                    page: page ? parseInt(page as string, 10) : undefined,
-                    limit: limit ? parseInt(limit as string, 10) : undefined
-                }
-            );
+            const { startDate, endDate, userId, storeUserId, action, page, limit } = req.query;
 
-            console.log(result);
-    
-            return res.status(200).json({
-                data: result.data,
-                users: result.users || [],
-                actions: result.actions || [],
-                pagination: {
-                    page: result.pagination?.page || 1,
-                    pageSize: result.pagination?.limit || 25,
-                    total: result.pagination?.total || 0,
-                    totalPages: result.pagination?.totalPages || 1
-                }
+            const result = await this.auditLogService.execute(Number(storeId), {
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
+                startDate: startDate ? new Date(startDate as string) : undefined,
+                endDate: endDate ? new Date(endDate as string) : undefined,
+                userId: userId ? Number(userId) : undefined,
+                storeUserId: storeUserId ? Number(storeUserId) : undefined,
+                action: action as string,
+                page: page ? Number(page) : 1,
+                limit: limit ? Number(limit) : 25
             });
+
+            return res.status(200).json(result);
         } catch (error) {
             next(error);
         }

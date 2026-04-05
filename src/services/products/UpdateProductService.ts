@@ -1,97 +1,81 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface UpdateProductRequest {
-    performedByUserId: number;
-    storeId: number;
-    categoryId?: number;
-    productId: number;
-    sku?: string;
-    name?: string;
-    price?: string;
-    description?: string;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class UpdateProductService {
-    async execute(data: UpdateProductRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
-        return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
 
-            const isOwner = await tx.store.findUnique({ 
-                where: { 
-                    id: data.storeId 
-                }, 
-                select: { 
-                    ownerId: true 
-                } 
+    async execute(data: any) {
+        this.validateInput(data);
+
+        return await prismaClient.$transaction(async (tx) => {
+            const product = await tx.product.findUnique({
+                where: { id: data.productId, storeId: data.storeId, isDeleted: false },
+                include: { store: { select: { ownerId: true } } }
             });
 
-            if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+            if (!product) {
+                throw new NotFoundError("ProductNotFound");
+            }
 
-            const store = await tx.store.findUnique({ where: { id: data.storeId, isDeleted: false } });
+            if (data.userType === 'OWNER' && product.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
-            if (!store) throw new NotFoundError("Loja nao encontrada");
-
-            if (!data.productId || isNaN(data.productId)) throw new ValidationError("ID do produto inválido");
-
-            const product = await tx.product.findUnique({ where: { id: data.productId } });
-            if (!product) throw new NotFoundError("Produto não encontrado");
-            if (product.isDeleted) throw new ConflictError("Produto excluído");
+            if (data.categoryId) {
+                const category = await tx.category.findFirst({
+                    where: { id: data.categoryId, storeId: data.storeId, isDeleted: false }
+                });
+                if (!category) throw new NotFoundError("CategoryNotFoundInThisStore");
+            }
 
             const updatedProduct = await tx.product.update({
-                where: { 
-                    id: data.productId,
-                    storeId: data.storeId,
-                    isDeleted: false
+                where: { id: data.productId },
+                data: {
+                    name: data.name || undefined,
+                    price: data.price || undefined,
+                    description: data.description || undefined,
+                    categoryId: data.categoryId || undefined,
+                    sku: data.sku || undefined
                 },
-                data: { 
-                    name: data.name,
-                    price: data.price,
-                    description: data.description,
-                    categoryId: data.categoryId,
-                    sku: data.sku
-                },
-                select: { id: true, name: true, price: true, stock: true }
+                select: { id: true, name: true, price: true, stock: true, sku: true, updatedAt: true }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
-
-            const oldData = JSON.stringify(product, null, 2);
-            const newData = JSON.stringify(updatedProduct, null, 2);
-
-            await auditLogService.create({
-                action: "PRODUCT_UPDATE",
-                details: {
-                    oldData,
-                    newData
-                },
-                ...(isOwner ? {
-                    userId: data.performedByUserId
-                } : {
-                    storeUserId: data.performedByUserId
-                }),
-                storeId: product.storeId,
-                ipAddress: data.ipAddress,
-                userAgent: data.userAgent
+                userId: data.performedByUserId
             });
+
+            await this.auditLogService.create({
+                action: "PRODUCT_UPDATE",
+                details: { 
+                    old: { name: product.name, price: product.price }, 
+                    new: { name: updatedProduct.name, price: updatedProduct.price } 
+                },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
             return updatedProduct;
         });
     }
 
-    private validateInput(data: UpdateProductRequest) {
-        if (data.price && isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
-        if (data.name?.length > 100) throw new ValidationError("Nome muito longo (máx. 100 caracteres)");
+    private validateInput(data: any) {
+        if (data.price && isNaN(parseFloat(data.price))) {
+             throw new ValidationError("InvalidPriceFormat");
+        }
     }
 }
 

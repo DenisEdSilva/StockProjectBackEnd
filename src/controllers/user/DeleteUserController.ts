@@ -2,17 +2,21 @@ import { Request, Response, NextFunction } from "express";
 import { DeleteUserService } from "../../services/user/DeleteUserService";
 
 class DeleteUserController {
+    constructor(private deleteUserService: DeleteUserService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
-            const parsedId = parseInt(id, 10);
+            const result = await this.deleteUserService.execute({ 
+                id: Number(req.params.id),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'] || ""
+            });
 
-            const deleteUserService = new DeleteUserService();
-            const result = await deleteUserService.execute({ id: parsedId });
-            
             return res.status(200).json(result);
-        } catch (error) {
-            next(error);
+        } catch (error) { 
+            next(error); 
         }
     }
 }

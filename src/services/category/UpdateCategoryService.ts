@@ -1,73 +1,88 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface UpdateCategoryRequest {
-    storeId: number;
-    categoryId: number;
-    performedByUserId: number;
-    name: string;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class UpdateCategoryService {
-    async execute({ storeId, categoryId, performedByUserId, name, ipAddress, userAgent }: UpdateCategoryRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
-        return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(name);
-            if (!storeId || isNaN(storeId)) throw new ValidationError("storeId da categoria inválido");
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
 
-            const isOwner = await tx.store.findUnique({
+    async execute(data: any) {
+        this.validateInput(data.name);
+
+        return await prismaClient.$transaction(async (tx) => {
+            const category = await tx.category.findUnique({
                 where: { 
-                    id: storeId 
+                    id: data.categoryId,
+                    storeId: data.storeId,
+                    isDeleted: false 
                 },
-                select: {
-                    ownerId: true
-                }
+                include: { store: { select: { ownerId: true } } }
             });
 
-            const category = await tx.category.findUnique({ where: { id: categoryId } });
-            if (!category) throw new NotFoundError("Categoria não encontrada");
-            if (category.isDeleted) throw new ConflictError("Categoria excluída");
+            if (!category) {
+                throw new NotFoundError("CategoryNotFound");
+            }
+
+            if (data.userType === 'OWNER' && category.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.name !== category.name) {
+                const nameExists = await tx.category.findFirst({
+                    where: { 
+                        name: data.name, 
+                        storeId: data.storeId, 
+                        isDeleted: false,
+                        NOT: { id: data.categoryId }
+                    }
+                });
+
+                if (nameExists) {
+                    throw new ConflictError("CategoryNameAlreadyExists");
+                }
+            }
 
             const updatedCategory = await tx.category.update({
-                where: { id: categoryId },
-                data: { name },
-                select: { storeId: true, name: true, updatedAt: true }
+                where: { id: data.categoryId },
+                data: { name: data.name },
+                select: { id: true, name: true, updatedAt: true }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
-
-            await auditLogService.create({
-                action: "CATEGORY_UPDATE",
-                details: {
-                    oldName: category.name,
-                    newName: updatedCategory.name
-                },
-                ...(isOwner ? {
-                    userId: performedByUserId
-                } : {
-                    storeUserId: performedByUserId
-                }),
-                storeId: category.storeId,
-                ipAddress,
-                userAgent
+                storeId: data.storeId,
+                userId: data.performedByUserId
             });
+
+            await this.auditLogService.create({
+                action: "CATEGORY_UPDATE",
+                details: { 
+                    oldName: category.name, 
+                    newName: data.name 
+                },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
             return updatedCategory;
         });
     }
 
     private validateInput(name: string) {
-        if (!name?.trim()) throw new ValidationError("Nome inválido");
-        if (name.length > 50) throw new ValidationError("Nome muito longo (máx. 50 caracteres)");
+        if (!name?.trim() || name.length > 50) {
+            throw new ValidationError("InvalidCategoryName");
+        }
     }
 }
 

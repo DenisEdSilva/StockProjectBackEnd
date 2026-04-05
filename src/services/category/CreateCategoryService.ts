@@ -1,120 +1,108 @@
 import prismaClient from "../../prisma";
-import { ValidationError, ConflictError, NotFoundError, UnauthorizedError } from "../../errors";
+import { ValidationError, ConflictError, NotFoundError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface CategoryRequest {
     performedByUserId: number;
+    userType: 'OWNER' | 'STORE_USER';
+    tokenStoreId?: number;
     name: string;
     storeId: number;
-    userId: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class CreateCategoryService {
-    async execute({ performedByUserId, name, storeId, userId, ipAddress, userAgent }: CategoryRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: CategoryRequest) {
+        this.validateInput(data.name, data.storeId);
+
         return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(name, storeId);
-
-            const storeData = await tx.store.findUnique({
-                            where: { id: storeId },
-                            select: { ownerId: true }
-                        });
-            
-                        const isOwner = storeData.ownerId === performedByUserId;
-            
-                        if (!isOwner) {
-                            const storeUserPerformer = await tx.storeUser.findUnique({
-                                where: {
-                                    id: performedByUserId,
-                                    storeId: storeId,
-                                    isDeleted: false
-                                }
-                            });
-                            
-                            if (!storeUserPerformer) {
-                                throw new UnauthorizedError("Usuário não autorizado");
-                            }
-                        }
-
-            const [store, existingCategory] = await Promise.all([
-                tx.store.findUnique({ where: { id: storeId } }),
-                tx.category.findFirst({ where: { name, storeId, isDeleted: false } })
-            ]);
-
-            if (!store) throw new NotFoundError("Loja não encontrada");
-            if (existingCategory) throw new ConflictError("Categoria já existe");
-
-            const category = await tx.category.create({
-                data: { name, storeId },
-                select: { id: true, name: true, createdAt: true }
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId, isDeleted: false },
+                select: { ownerId: true }
             });
 
-            const isOwnerAction = await tx.user.findUnique({ 
+            if (!store) {
+                throw new NotFoundError("StoreNotFound");
+            }
+
+            if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedStoreAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedStoreAccess");
+            }
+
+            const existingCategory = await tx.category.findFirst({
                 where: { 
-                    id: userId 
-                },
-                select: {
-                    id: true,
+                    name: data.name, 
+                    storeId: data.storeId, 
+                    isDeleted: false 
                 }
             });
 
-            const updates = [];
-
-            updates.push(
-                tx.store.update({
-                    where: { id: storeId },
-                    data: {
-                        lastActivityAt: new Date(),
-                    }
-                })
-            );
-            
-            if (isOwnerAction) {
-                updates.push(
-                    tx.user.update({
-                        where: { id: userId },
-                        data: {
-                            lastActivityAt: new Date(),
-                        }
-                    })
-                )
+            if (existingCategory) {
+                throw new ConflictError("CategoryAlreadyExistsInThisStore");
             }
 
-            await Promise.all(updates);
-
-            await activityTracker.track({
-                tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
-
-            await auditLogService.create({
-                    action: "CATEGORY_CREATE",
-                    details: {
-                        id: category.id,
-                        name: category.name
-                    },
-                    ...(isOwner ? {
-                        userId: performedByUserId,
-                    } : {
-                        storeUserId: performedByUserId
-                    }),
-                    storeId,
-                    ipAddress,
-                    userAgent
+            const category = await tx.category.create({
+                data: { 
+                    name: data.name, 
+                    storeId: data.storeId 
+                },
+                select: { 
+                    id: true, 
+                    name: true, 
+                    createdAt: true 
+                }
             });
+
+            await tx.store.update({
+                where: { id: data.storeId },
+                data: { lastActivityAt: new Date() }
+            });
+
+            if (data.userType === 'OWNER') {
+                await tx.user.update({
+                    where: { id: data.performedByUserId },
+                    data: { lastActivityAt: new Date() }
+                });
+            }
+
+            await this.activityTracker.track({
+                tx,
+                storeId: data.storeId,
+                userId: data.performedByUserId
+            });
+
+            await this.auditLogService.create({
+                action: "CATEGORY_CREATE",
+                details: { 
+                    id: category.id, 
+                    name: category.name 
+                },
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
             return category;
         });
     }
 
     private validateInput(name: string, storeId: number) {
-        if (!name?.trim()) throw new ValidationError("Nome da categoria inválido");
-        if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+        if (!name?.trim()) throw new ValidationError("InvalidCategoryName");
+        if (!Number.isInteger(storeId)) throw new ValidationError("InvalidStoreId");
     }
 }
 

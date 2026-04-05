@@ -2,16 +2,20 @@ import { Request, Response, NextFunction } from "express";
 import { GetCategoryByIdService } from "../../services/category/GetCategoryByIdService";
 
 class GetCategoryByIdController {
-    async handle(req: Request, res: Response, next: NextFunction) {
-        const storeId = parseInt(req.params.storeId, 10);
-        const categoryId = parseInt(req.params.categoryId, 10);
+    constructor(private getCategoryByIdService: GetCategoryByIdService) {}
 
-        const service = new GetCategoryByIdService();
+    async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const category = await service.execute({ 
-                storeId, 
-                id: categoryId 
+            const { storeId, categoryId } = req.params;
+
+            const category = await this.getCategoryByIdService.execute({ 
+                storeId: Number(storeId), 
+                id: Number(categoryId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId
             });
+
             return res.status(200).json(category);
         } catch (error) {
             next(error);

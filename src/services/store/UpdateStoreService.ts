@@ -1,92 +1,94 @@
+import { Prisma } from "@prisma/client";
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface UpdateStoreRequest {
-    storeId: number;
-    performedByUserId: number;
-    userId: number;
-    ipAddress: string;
-    userAgent: string;
-    name?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-}
-
 class UpdateStoreService {
-    async execute(data: UpdateStoreRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
-        return await prismaClient.$transaction(async (tx) => {
-            if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
 
+    async execute(data: any) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+
+        return await prismaClient.$transaction(async (tx) => {
             const store = await tx.store.findUnique({
-                where: { id: data.storeId },
-                select: { ownerId: true, name: true, city: true, state: true, zipCode: true }
+                where: { 
+                    id: data.storeId, 
+                    isDeleted: false 
+                }
             });
 
-            if (!store) throw new NotFoundError("Loja não encontrada");
-            if (store.ownerId !== data.userId) throw new ForbiddenError("Acesso não autorizado");
+            if (!store) {
+                throw new NotFoundError("StoreNotFound");
+            }
 
-            const updateData: Record<string, any> = {};
+            if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
-            if (data.name !== undefined && data.name !== store.name) {
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            const updateData: Prisma.StoreUpdateInput = {
+                lastActivityAt: new Date()
+            };
+
+            if (data.name && data.name !== store.name) {
+                const nameExists = await tx.store.findFirst({
+                    where: {
+                        name: data.name,
+                        ownerId: store.ownerId,
+                        NOT: { id: data.storeId },
+                        isDeleted: false
+                    }
+                });
+
+                if (nameExists) {
+                    throw new ConflictError("StoreNameAlreadyExists");
+                }
                 updateData.name = data.name;
             }
-            if (data.city !== undefined && data.city !== store.city) {
-                updateData.city = data.city;
-            }
-            if (data.state !== undefined) {
-                if (data.state.length !== 2) throw new ValidationError("Sigla do estado deve ter 2 caracteres");
-                if (data.state !== store.state) updateData.state = data.state;
-            }
-            if (data.zipCode !== undefined && data.zipCode !== store.zipCode) {
-                updateData.zipCode = data.zipCode;
-            }
 
-            if (Object.keys(updateData).length === 0) {
-                return { 
-                    message: "Nenhuma alteração necessária",
-                    store: { ...store, ...updateData }
-                };
+            if (data.city) updateData.city = data.city;
+            if (data.state) {
+                if (data.state.length !== 2) {
+                    throw new ValidationError("InvalidStateCode");
+                }
+                updateData.state = data.state;
+            }
+            if (data.zipCode) {
+                updateData.zipCode = data.zipCode.replace(/\D/g, '');
             }
 
             const updatedStore = await tx.store.update({
                 where: { id: data.storeId },
-                data: updateData,
-                select: { id: true, name: true, city: true, state: true, zipCode: true }
+                data: updateData
             });
 
-            await Promise.all([
-                tx.store.update({
-                    where: { id: data.storeId },
-                    data: { lastActivityAt: new Date() }
-                }),
-                tx.user.update({
-                    where: { id: data.userId },
-                    data: { lastActivityAt: new Date() }
-                })
-            ]);
-
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
+                userId: data.performedByUserId
+            });
 
-            await auditLogService.create({
+            await this.auditLogService.create({
                 action: "STORE_UPDATE",
-                details: {
-                    from: store,
-                    to: updatedStore
-                },
-                userId: data.performedByUserId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
                 storeId: data.storeId,
                 ipAddress: data.ipAddress,
-                userAgent: data.userAgent
-            });
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER',
+                details: {
+                    updatedFields: Object.keys(updateData)
+                }
+            }, tx);
 
             return updatedStore;
         });

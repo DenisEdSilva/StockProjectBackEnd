@@ -2,19 +2,23 @@ import { Request, Response, NextFunction } from "express";
 import { GetRoleByIdService } from "../../services/role/GetRoleByIdService";
 
 class GetRoleByIdController {
+    constructor(private getRoleByIdService: GetRoleByIdService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId, roleId } = req.params;
 
-            const service = new GetRoleByIdService();
-            const role = await service.execute({ 
-                id: parseInt(req.params.roleId, 10), 
-                storeId: parseInt(storeId, 10) 
+            const role = await this.getRoleByIdService.execute({
+                id: Number(roleId),
+                storeId: Number(storeId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId
             });
 
             return res.status(200).json(role);
         } catch (error) {
-            next(error);   
+            next(error);
         }
     }
 }

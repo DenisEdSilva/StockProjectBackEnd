@@ -1,44 +1,52 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
-interface categoryByIdrequest {
-    storeId: number,
-    id: number
+interface CategoryByIdRequest {
+    storeId: number;
+    id: number;
+    performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
 }
 
-export class GetCategoryByIdService {
-    async execute( data: categoryByIdrequest ) {
-        return await prismaClient.$transaction(async (tx) => {
+class GetCategoryByIdService {
+    async execute(data: CategoryByIdRequest) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+        if (!Number.isInteger(data.id)) {
+            throw new ValidationError("InvalidCategoryId");
+        }
 
-            if (!data.storeId || isNaN(data.storeId)) {
-                throw new ValidationError("ID da loja inválido");
+        const category = await prismaClient.category.findUnique({ 
+            where: { 
+                id: data.id,
+                storeId: data.storeId,
+                isDeleted: false
+            },
+            include: {
+                store: { select: { ownerId: true } }
             }
+        });
 
-            if (!data.id || isNaN(data.id)) {
-                throw new ValidationError("ID da categoria inválido");
-            }
+        if (!category) throw new NotFoundError("CategoryNotFound");
 
-            const category = await tx.category.findUnique({ 
-                where: { 
-                    storeId: data.storeId,
-                    id: data.id,
-                    isDeleted: false
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    storeId: true,
-                    createdAt: true,
-                    updatedAt: true
-                }
-            });
+        if (data.userType === 'OWNER' && category.store.ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
 
-            if (!category) throw new NotFoundError("Categoria nao encontrada");
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
 
-            return category
-        })
+        return {
+            id: category.id,
+            name: category.name,
+            storeId: category.storeId,
+            createdAt: category.createdAt,
+            updatedAt: category.updatedAt
+        };
     }
-
 }
 
-export default new GetCategoryByIdService();
+export { GetCategoryByIdService };

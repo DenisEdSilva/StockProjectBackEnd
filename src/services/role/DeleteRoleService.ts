@@ -1,78 +1,81 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface DeleteRoleRequest {
-    performedByUserId: number;
-    storeId: number;
-    roleId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class DeleteRoleService {
-    async execute({ performedByUserId, storeId, roleId, ipAddress, userAgent }: DeleteRoleRequest) {
-        const auditlogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
+        if (!Number.isInteger(data.roleId)) {
+            throw new ValidationError("InvalidRoleId");
+        }
+
         return await prismaClient.$transaction(async (tx) => {
-            if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
-
-            const isOwner = tx.store.findUnique({
-                where: {
-                    id: storeId
-                },
-                select: {
-                    ownerId: true
-                }
-            })
-
             const role = await tx.role.findUnique({
-                where: { id: roleId },
-                include: { store: true }
+                where: { 
+                    id: data.roleId,
+                    storeId: data.storeId,
+                    isDeleted: false 
+                },
+                include: { store: { select: { ownerId: true } } }
             });
-            if (!role) throw new NotFoundError("Perfil não encontrado");
 
-            if (role.store.ownerId !== performedByUserId) throw new ConflictError("Acesso não autorizado");
+            if (!role) {
+                throw new NotFoundError("RoleNotFound");
+            }
 
-            const usersCount = await tx.storeUser.count({ where: { roleId } });
-            if (usersCount > 0) throw new ConflictError("Perfil está em uso");
+            if (data.userType === 'OWNER' && role.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            const usersCount = await tx.storeUser.count({ 
+                where: { 
+                    roleId: data.roleId,
+                    isDeleted: false 
+                } 
+            });
+
+            if (usersCount > 0) {
+                throw new ConflictError("RoleIsInUseByActiveUsers");
+            }
 
             const deletedRole = await tx.role.update({
-                where: { id: roleId },
-                data: { isDeleted: true, deletedAt: new Date() }
+                where: { id: data.roleId },
+                data: { 
+                    isDeleted: true, 
+                    deletedAt: new Date() 
+                }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
+                storeId: data.storeId,
+                userId: data.performedByUserId
+            });
 
-            const deletedData = await tx.role.findUnique({ where: { id: roleId }})
-
-            await auditlogService.create({
+            await this.auditLogService.create({
                 action: "ROLE_DELETE",
-                details: {
-                    deletedData
-                },
-                ...(isOwner ? {
-                    userId: performedByUserId
-                } : {
-                    storeUserId: performedByUserId
-                }),
-                storeId: storeId,
-                ipAddress: ipAddress,
-                userAgent: userAgent
-            })
+                details: { roleId: data.roleId, name: role.name },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
             return { 
-                message: "cargo excluído",
+                message: "RoleDeletedSuccessfully",
                 deletedAt: deletedRole.deletedAt
             };
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
     }
 }

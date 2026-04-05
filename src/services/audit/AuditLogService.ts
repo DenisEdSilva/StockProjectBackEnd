@@ -1,9 +1,11 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 import { Prisma } from "@prisma/client";
 
 interface AuditLogRequest {
-    requestUserId: number;
+    performedByUserId: number;
+    userType: 'OWNER' | 'STORE_USER';
+    tokenStoreId?: number;
     startDate?: Date;
     endDate?: Date;
     userId?: number;
@@ -16,8 +18,20 @@ interface AuditLogRequest {
 class AuditLogService {
     async execute(storeId: number, filters: AuditLogRequest) {
         return await prismaClient.$transaction(async (tx) => {
-            if (filters.requestUserId !== 1) {
+            if (filters.performedByUserId !== 1) {
                 throw new ValidationError("Usuário não autorizado");
+            }
+
+            const store = await prismaClient.store.findUnique({
+                where: { id: storeId, isDeleted: false },
+                select: { ownerId: true }
+            });
+
+            if (filters.userType === 'OWNER' && store.ownerId !== filters.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+            if (filters.userType === 'STORE_USER' && filters.tokenStoreId !== storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
             }
 
             this.validateDates(filters.startDate, filters.endDate);
@@ -159,24 +173,25 @@ class AuditLogService {
         return actionTranslations[action] || action;
     }
 
-    private formatDetails(action: string, details: string): string {
-        try {
-            const parsed = JSON.parse(details);
-            
-            switch(action) {
-                case 'ROLE_UPDATE':
-                    return `Cargo: ${parsed.name}\nPermissões: ${parsed.permissionIds?.join(', ')}`;
-                case 'USER_CREATE':
-                    return `Email: ${parsed.email}\nTipo: ${parsed.type}`;
-                case 'PRODUCT_UPDATE':
-                    return `Produto: ${parsed.name}\nPreço: R$ ${parsed.price}\nEstoque: ${parsed.stock}`;
-                default:
-                    return Object.entries(parsed)
+    private formatDetails(action: string, details: Prisma.JsonValue | null): string {
+        if (!details) return '';
+        
+        const parsed = typeof details === 'string' ? JSON.parse(details) : details;
+
+        switch(action) {
+            case 'ROLE_UPDATE':
+                return `Cargo: ${parsed['name']}\nPermissões: ${parsed['permissionIds']?.join(', ')}`;
+            case 'USER_CREATE':
+                return `Email: ${parsed['email']}\nTipo: ${parsed['type']}`;
+            case 'PRODUCT_UPDATE':
+                return `Produto: ${parsed['name']}\nPreço: R$ ${parsed['price']}\nEstoque: ${parsed['stock']}`;
+            default:
+                if (typeof parsed === 'object') {
+                    return Object.entries(parsed as Record<string, any>)
                         .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
                         .join('\n');
-            }
-        } catch {
-            return details;
+                }
+                return String(parsed);
         }
     }
 

@@ -2,20 +2,20 @@ import { Request, Response, NextFunction } from "express";
 import { DetailUserService } from "../../services/user/DetailUserService";
 
 class DetailUserController {
+    constructor(private detailUserService: DetailUserService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const userId = req.user.id;
-
-            const detailUserService = new DetailUserService();
-            const user = await detailUserService.execute({
-                userId,
+            const result = await this.detailUserService.execute({
+                userId: req.user.id,
+                userType: req.user.type,
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
-            return res.status(200).json(user);
-        } catch (error) {
-            next(error);
+
+            return res.status(200).json(result);
+        } catch (error) { 
+            next(error); 
         }
     }
 }

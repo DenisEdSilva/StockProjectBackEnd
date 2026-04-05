@@ -1,10 +1,12 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
 interface UpdateRoleRequest {
     performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     storeId: number;
     roleId: number;
     name: string;
@@ -14,112 +16,124 @@ interface UpdateRoleRequest {
 }
 
 class UpdateRoleService {
-    async execute({ performedByUserId, storeId, roleId, name, permissionIds, ipAddress, userAgent }: UpdateRoleRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: UpdateRoleRequest) {
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-
-            const isOwner = await prismaClient.store.findUnique({ where: { id: storeId }, select: { ownerId: true } });
-
-            if (!roleId || isNaN(roleId)) throw new ValidationError("ID do perfil inválido");
-            if (!name?.trim()) throw new ValidationError("Nome inválido");
-            if (!permissionIds?.length) throw new ValidationError("Deve conter pelo menos uma permissão");
-
-            const role = await tx.role.findUnique({ 
-                where: { id: roleId },
-                include: { permissions: true }
+            const role = await tx.role.findUnique({
+                where: { 
+                    id: data.roleId,
+                    storeId: data.storeId,
+                    isDeleted: false 
+                },
+                include: { 
+                    store: { select: { ownerId: true } },
+                    permissions: { select: { permissionId: true } }
+                }
             });
 
-            if (!role) throw new NotFoundError("Perfil não encontrado");
-
-            const validPermissions = await tx.permission.findMany({ 
-                where: { id: { in: permissionIds } },
-                select: { id: true } 
-            });
-
-            if (validPermissions.length !== permissionIds.length) {
-                throw new ValidationError("Contém permissões inválidas");
+            if (!role) {
+                throw new NotFoundError("RoleNotFound");
             }
 
-            await tx.role.update({ 
-                where: { 
-                    id: roleId 
-                }, 
-                data: { 
-                    name 
-                } 
+            if (data.userType === 'OWNER' && role.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            const validPermissions = await tx.permission.findMany({
+                where: { id: { in: data.permissionIds } },
+                select: { id: true }
             });
 
-            const currentPermissionIds = role.permissions.map(rp => rp.permissionId);
-            const numericPermissionIds = permissionIds.map(Number);
+            if (validPermissions.length !== data.permissionIds.length) {
+                throw new ValidationError("InvalidPermissionsDetected");
+            }
 
-            const toAdd = numericPermissionIds.filter(id => !currentPermissionIds.includes(id));
-            console.log("toAdd: ", toAdd);
-            
-            const toRemove = currentPermissionIds.filter(id => !numericPermissionIds.includes(id));
-            console.log("toRemove: ", toRemove);
+            const currentIds = role.permissions.map(p => p.permissionId);
+            const toAdd = data.permissionIds.filter(id => !currentIds.includes(id));
+            const toRemove = currentIds.filter(id => !data.permissionIds.includes(id));
+
+            await tx.role.update({
+                where: { id: data.roleId },
+                data: { name: data.name }
+            });
 
             if (toRemove.length > 0) {
                 await tx.rolePermissionAssociation.deleteMany({
-                    where: { 
-                        roleId, 
-                        permissionId: { 
-                            in: toRemove 
-                        } 
+                    where: {
+                        roleId: data.roleId,
+                        permissionId: { in: toRemove }
                     }
                 });
             }
 
             if (toAdd.length > 0) {
                 await tx.rolePermissionAssociation.createMany({
-                    data: toAdd.map(permissionId => ({ 
-                        roleId, 
-                        permissionId 
-                    })),
-                    skipDuplicates: true
+                    data: toAdd.map(id => ({
+                        roleId: data.roleId,
+                        permissionId: id
+                    }))
                 });
             }
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
-
-            await auditLogService.create({
-                action: "ROLE_UPDATE",
-                details: {
-                    roleId,
-                    name,
-                    permissionIds
-                },
-                ...(isOwner ? {
-                    userId: performedByUserId
-                }: {
-                    storeUserId: performedByUserId
-                }),
-                storeId: storeId,
-                ipAddress: ipAddress,
-                userAgent: userAgent
-            })
-
-            return await tx.role.findUnique({
-                where: { 
-                    id: roleId 
-                },
-                include: { 
-                    permissions: { 
-                        include: { 
-                            permission: true 
-                        } 
-                    } 
-                }
+                storeId: data.storeId,
+                userId: data.performedByUserId
             });
 
+            await this.auditLogService.create({
+                action: "ROLE_UPDATE",
+                details: {
+                    roleId: data.roleId,
+                    name: data.name,
+                    added: toAdd,
+                    removed: toRemove
+                },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
+
+            return await tx.role.findUnique({
+                where: { id: data.roleId },
+                include: {
+                    permissions: {
+                        include: { permission: true }
+                    }
+                }
+            });
         }, {
             maxWait: 15000,
             timeout: 15000
         });
+    }
+
+    private validateInput(data: UpdateRoleRequest) {
+        if (!Number.isInteger(data.roleId)) {
+            throw new ValidationError("InvalidRoleId");
+        }
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+        if (!data.name?.trim()) {
+            throw new ValidationError("InvalidRoleName");
+        }
+        if (!Array.isArray(data.permissionIds) || data.permissionIds.length === 0) {
+            throw new ValidationError("AtLeastOnePermissionIsRequired");
+        }
     }
 }
 

@@ -1,69 +1,122 @@
 import { NextFunction, Request, Response } from "express";
 import { verify } from "jsonwebtoken";
 import { redisClient } from "../redis.config";
-import { UnauthorizedError, ValidationError } from "../errors";
-import cookie from "cookie-parser";
+import { UnauthorizedError, ValidationError, ForbiddenError } from "../errors";
+import prismaClient from "../prisma";
+import { AccessControlProvider } from "../shared/AccessControlProvider";
 
 declare module "express" {
     interface Request {
         user: {
             id: number;
-            type: 'owner' | 'store';
-            permissions?: string[];
+            type: 'OWNER' | 'STORE_USER';
+            permissions?: {
+                action: string;
+                resource: string;
+            }[];
             storeId?: number;
         };
     }
 }
 
-export async function authenticated(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function authenticated(
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> {
     try {
-        const token = req.cookies.access_token;
-
+        const token = req.cookies?.access_token;
+        
         if (!token) {
-            throw new ValidationError("Token não encontrado nos cookies");
+            throw new ValidationError("TokenNotFound");
         }
 
-        const decoded = verify(token, process.env.JWT_SECRET!) as {
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            throw new Error("ServerConfigurationError");
+        }
+
+        const decoded = verify(token, jwtSecret) as {
             id: number;
-            type: 'owner' | 'store';
+            type: 'OWNER' | 'STORE_USER';
             storeId?: number;
         };
 
-        if (!['owner', 'store'].includes(decoded.type)) {
-            throw new UnauthorizedError("Tipo de usuário inválido");
+        if (!['OWNER', 'STORE_USER'].includes(decoded.type)) {
+            throw new UnauthorizedError("InvalidUserType");
         }
 
-        const redisKey = decoded.type === 'owner' 
+        const redisKey = decoded.type === 'OWNER'
             ? `owner:${decoded.id}`
             : `store:${decoded.storeId}:user:${decoded.id}`;
 
-        const userData = await redisClient.get(redisKey);
+        let userDataStr: string | null = null;
         
-        if (!userData) {
-            throw new UnauthorizedError("Sessão expirada ou inválida");
+        try {
+            if (redisClient.isOpen) {
+                userDataStr = await redisClient.get(redisKey);
+            }
+        } catch (error) {}
+
+        if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            req.user = {
+                id: decoded.id,
+                type: decoded.type,
+                ...(decoded.type === 'STORE_USER' && {
+                    storeId: decoded.storeId,
+                    permissions: userData.permissions || [],
+                }),
+            };
+            return next();
         }
 
-        const user = JSON.parse(userData);
-        req.user = {
-            id: decoded.id,
-            type: decoded.type,
-            ...(decoded.type === 'store' && {
+        if (decoded.type === 'OWNER') {
+            const owner = await prismaClient.user.findUnique({
+                where: { id: decoded.id, isDeleted: false },
+                select: { id: true, isOwner: true }
+            });
+
+            if (!owner || !owner.isOwner) {
+                throw new UnauthorizedError("SessionInvalid");
+            }
+
+            req.user = { id: decoded.id, type: 'OWNER' };
+        } else {
+            const accessControl = new AccessControlProvider();
+            const userData = await accessControl.uintToACL(decoded.id, prismaClient);
+
+            req.user = {
+                id: decoded.id,
+                type: 'STORE_USER',
                 storeId: decoded.storeId,
-                permissions: user.permissions || []
-            })
-        };
+                permissions: userData.permissions,
+            };
+
+            try {
+                if (redisClient.isOpen) {
+                    await redisClient.setEx(
+                        redisKey,
+                        30 * 24 * 3600,
+                        JSON.stringify({
+                            id: userData.id,
+                            name: userData.name,
+                            email: userData.email,
+                            storeId: decoded.storeId,
+                            permissions: userData.permissions
+                        })
+                    );
+                }
+            } catch (error) {}
+        }
 
         next();
-    } catch (error) {
-        if (error instanceof Error) {
-            switch (error.name) {
-                case 'TokenExpiredError':
-                    return next(new UnauthorizedError("Sessão expirada"));
-                case 'JsonWebTokenError':
-                    return next(new UnauthorizedError("Token inválido"));
-                default:
-                    return next(error);
-            }
+    } catch (error: any) {
+        if (error.name === "TokenExpiredError") {
+            return next(new UnauthorizedError("SessionExpired"));
+        }
+        if (error.name === "JsonWebTokenError") {
+            return next(new UnauthorizedError("InvalidToken"));
         }
         next(error);
     }

@@ -1,138 +1,126 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
+import { Prisma } from "@prisma/client";
 
 interface ProductRequest {
     banner: string;
     name: string;
-    stock: number;
-    price: string;
+    price: Prisma.Decimal;
     description: string;
     categoryId: number;
     storeId: number;
     performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class CreateProductService {
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
     async execute(data: ProductRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
-
-            const [category, store] = await Promise.all([
-                tx.category.findUnique({ where: { id: data.categoryId, isDeleted: false } }),
-                tx.store.findUnique({ where: { id: data.storeId, isDeleted: false } })
-            ]);
-
-            const isOwner = await tx.store.findUnique({
-                where: { 
-                    id: data.storeId 
-                },
-                select: {
-                    ownerId: true
-                }
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId, isDeleted: false },
+                select: { id: true, name: true, ownerId: true }
             });
 
-            if (!category) throw new NotFoundError("Categoria não encontrada");
-            if (!store) throw new NotFoundError("Loja não encontrada");
+            if (!store) throw new NotFoundError("StoreNotFound");
 
-            const generateAbbreviation = (name: string, length: number) => {
-                const letters = name.replace(/\s/g, '').substring(0, length).toUpperCase();
-
-                return letters.padEnd(length, 'X'.substring(0, length));
+            if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
             }
 
-            const generateUniqueCode = (productName: string, length = 7) => {
-                const cleanedName = productName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
-                const initials = cleanedName.split(' ').map(word => word.charAt(0)).join('');
-
-                const code = (initials + cleanedName).substring(0, length);
-
-                return code;
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
             }
 
-            async function getOrCreateUniqueCode(productName: string, categoryid: number, ) {
-                const cleanedName = data.name.trim();
+            const category = await tx.category.findFirst({
+                where: { id: data.categoryId, storeId: data.storeId, isDeleted: false },
+                select: { id: true, name: true }
+            });
 
-                const existingProduct = await tx.product.findFirst({
-                    where: {
-                        name: cleanedName,
-                        categoryId: data.categoryId,
-                    },
-                    select: {
-                        sku: true,
-                    },
-                });
+            if (!category) throw new NotFoundError("CategoryNotFoundInThisStore");
 
-                if (existingProduct) {
-                    const [_, uniqueCode] = existingProduct.sku.split('-');
-                    return uniqueCode;
-                }
+            const categoryAbbr = this.generateAbbr(category.name, 4);
+            const storeAbbr = this.generateAbbr(store.name, 4);
+            const productCode = await this.getUniqueProductCode(tx, data.name, data.categoryId);
+            
+            const sku = `${categoryAbbr}-${productCode}-${storeAbbr}`;
 
-                return generateUniqueCode(productName)
-            }
-
-
-            const categoryAbbreviation = generateAbbreviation(category.name, 4);
-            const storePreffix = generateAbbreviation(store.name, 4);
-            const uniqueCode = await getOrCreateUniqueCode(data.name, data.categoryId);
-            const skuFormated = `${categoryAbbreviation}-${uniqueCode}-${storePreffix}`;
+            const skuExists = await tx.product.findFirst({ where: { sku, storeId: data.storeId } });
+            if (skuExists) throw new ConflictError("ProductWithThisSKUAlreadyExists");
 
             const product = await tx.product.create({
                 data: {
                     banner: data.banner,
                     name: data.name,
-                    stock: data.stock,
                     price: data.price,
                     description: data.description,
-                    sku: skuFormated,
+                    sku: sku,
                     categoryId: data.categoryId,
                     storeId: data.storeId
                 },
                 select: { id: true, name: true, price: true, stock: true, sku: true }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
-
-            await auditLogService.create({
-                    action: "PRODUCT_CREATE",
-                    details: {
-                        banner: data.banner,
-                        name: data.name,
-                        stock: data.stock,
-                        price: data.price,
-                        sku: skuFormated,
-                        description: data.description,
-                        categoryId: data.categoryId
-                    },
-                    ...(isOwner ? {
-                        userId: data.performedByUserId
-                    }: {
-                        storeUserId: data.performedByUserId
-                    }),
-                    storeId: data.storeId,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
+                userId: data.performedByUserId
             });
+
+            await this.auditLogService.create({
+                action: "PRODUCT_CREATE",
+                details: { productId: product.id, sku: product.sku, name: product.name },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
             return product;
         });
     }
 
+    private generateAbbr(text: string, len: number): string {
+        return text.replace(/[^a-zA-Z]/g, '').substring(0, len).toUpperCase().padEnd(len, 'X');
+    }
+
+    private async getUniqueProductCode(tx: any, name: string, categoryId: number): Promise<string> {
+        const cleaned = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        const baseCode = cleaned.substring(0, 5);
+
+        const existing = await tx.product.findFirst({
+            where: { name: name.trim(), categoryId: categoryId },
+            select: { sku: true }
+        });
+
+        if (existing) {
+            return existing.sku.split('-')[1];
+        }
+
+        const randomSuffix = Math.random().toString(36).substring(2, 4).toUpperCase();
+        return `${baseCode}${randomSuffix}`;
+    }
+
     private validateInput(data: ProductRequest) {
-        if (!data.banner?.trim()) throw new ValidationError("Banner obrigatório");
-        if (!data.name?.trim()) throw new ValidationError("Nome obrigatório");
-        if (data.stock < 0) throw new ValidationError("Estoque inválido");
-        if (isNaN(parseFloat(data.price))) throw new ValidationError("Preço inválido");
+        if (!data.name?.trim()) {
+            throw new ValidationError("InvalidProductName");
+        }
+        if (!data.price || data.price.isNaN() || data.price.lessThanOrEqualTo(0)) {
+            throw new ValidationError("InvalidPrice");
+        }
     }
 }
 

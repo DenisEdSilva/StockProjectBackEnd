@@ -1,60 +1,80 @@
-# StockProject API
+# StockProject API 🚀
 
-API para gestão de lojas, estoque, produtos, usuários e auditoria.  
-**Documentação Oficial** · [Repositório](https://github.com/DenisEdSilva/StockProject)
+API robusta para gestão de múltiplas lojas (Multi-tenant), controle de estoque rigoroso, produtos, usuários com permissões granulares (RBAC) e auditoria completa de ações.
+
+**Documentação Técnica** · [Repositório GitHub](https://github.com/DenisEdSilva/StockProject)
 
 ---
 
-## Índice
+## 📋 Índice
 - [🛠 Tecnologias](#-tecnologias)
 - [🌟 Funcionalidades Principais](#-funcionalidades-principais)
-- [📦 Instalaçao](#-instalacao)
-- [🔧 Variaveis de Ambiente](#-variaveis-de-ambiente)
-- [🔑 Autenticaçao](#-autenticacao)
-- [📚 Documentação das Rotas](#-documentacao-das-rotas)
-  - [Usuarios](#usuarios)
-  - [Lojas](#lojas)
-  - [Roles](#roles)
-  - [StoreUsers](#store-users)
-  - [Categorias](#categorias)
-  - [Produtos](#produtos)
-  - [Estoque](#estoque)
+- [🏗 Arquitetura de Permissões (RBAC)](#-arquitetura-de-permissões-rbac)
+- [📦 Instalação e Setup](#-instalação-e-setup)
+- [🔧 Variáveis de Ambiente](#-variáveis-de-ambiente)
+- [🔑 Autenticação e Segurança](#-autenticação-e-segurança)
+- [📚 Documentação das Rotas](#-documentação-das-rotas)
+  - [Autenticação e Sessões](#autenticação-e-sessões)
+  - [Gestão de Owners (Donos)](#gestão-de-owners-donos)
+  - [Gestão de Lojas (Stores)](#gestão-de-lojas-stores)
+  - [Cargos e Permissões (Roles)](#cargos-e-permissões-roles)
+  - [Funcionários (StoreUsers)](#funcionários-storeusers)
+  - [Categorias e Produtos](#categorias-e-produtos)
+  - [Movimentações de Estoque](#movimentações-de-estoque)
   - [Auditoria](#auditoria)
 - [🚨 Tratamento de Erros](#-tratamento-de-erros)
 
 ---
 
 ## 🛠 Tecnologias
-- **Node.js** & **Express**  
-- **Prisma** (PostgreSQL)  
-- **JWT** (Autenticação)  
-- **Redis** (Cache de sessões)  
-- **Bcrypt** (Criptografia de senhas)
+- **Runtime:** Node.js & Express
+- **Linguagem:** TypeScript
+- **ORM:** Prisma (PostgreSQL)
+- **Cache & Sessão:** Redis
+- **Segurança:** Bcryptjs (Hash de senhas) e JSON Web Token (JWT)
+- **Banco de Dados:** PostgreSQL
 
 ---
 
 ## 🌟 Funcionalidades Principais
-- Gestão de múltiplas lojas com donos (owners) e funcionários (storeUsers)  
-- Controle de permissões baseado em roles  
-- Auditoria detalhada de todas as ações críticas  
-- Soft delete e recuperação de recursos  
-- Movimentações de estoque com reversão  
+- **Multi-tenancy:** Isolamento total de dados entre diferentes lojas.
+- **Hierarquia de Usuários:** Distinção clara entre `OWNER` (Dono da conta) e `STORE_USER` (Funcionário da loja).
+- **Controle de Estoque Inteligente:** Movimentações de Entrada (IN), Saída (OUT) e Transferência entre lojas (TRANSFER) com validação de saldo e integridade.
+- **Sistema de Reversão:** Capacidade de reverter movimentações de estoque mantendo o histórico de auditoria.
+- **Auditoria Centralizada:** Registro automático de logs (`AuditLog`) para ações críticas e rastreamento de atividade (`ActivityTracker`).
+- **Soft Delete:** Sistema de deleção lógica com períodos de retenção configuráveis antes da exclusão definitiva.
 
 ---
 
-## 📦 Instalacao
-```bash
-# Clone o repositório
-git clone https://github.com/DenisEdSilva/StockProject.git
+## 🏗 Arquitetura de Permissões (RBAC)
+A API utiliza um modelo **RBAC (Role-Based Access Control)** padronizado pelos verbos HTTP para facilitar a integração com o Frontend:
+- **POST:** Permissão para criar recursos.
+- **GET:** Permissão para leitura/listagem.
+- **PUT:** Permissão para atualização total/edição.
+- **PATCH:** Permissão para atualizações parciais ou reversões.
+- **DELETE:** Permissão para exclusão.
 
-# Instale as dependências
+---
+
+## 📦 Instalação e Setup
+
+```bash
+# 1. Clone o repositório
+git clone [https://github.com/DenisEdSilva/StockProject.git](https://github.com/DenisEdSilva/StockProject.git)
+
+# 2. Acesse a pasta do projeto
+cd StockProject
+
+# 3. Instale as dependências
 npm install
 
-# Execute as migrações e seeds do Prisma
+# 4. Configure o banco de dados (Prisma)
 npx prisma migrate dev
-npm run seed
 
-# Inicie o servidor
+# 5. Popule as permissões iniciais (Seed)
+npx prisma db seed
+
+# 6. Inicie o servidor em modo de desenvolvimento
 npm run dev
 
 ```
@@ -64,28 +84,27 @@ npm run dev
 
 Crie um arquivo .env na raiz do projeto:
 ```bash
-DATABASE_URL="postgresql://postgres:admin@localhost:5432/StockProject?schema=public"
+# Conexão com Banco de Dados
+DATABASE_URL="postgresql://user:password@localhost:5432/StockProject?schema=public"
 
-#secret JWT hash generation
-JWT_SECRET = 076ee6c3d7dd190d9a45bad13d036c5a
+# Segurança
+JWT_SECRET="sua_chave_secreta_aqui"
 
-#tempo para deleção dos dados
-SOFT_DELETE_RETENTION_MINUTES = 30
+# Configurações de Retenção (em minutos)
+SOFT_DELETE_RETENTION_MINUTES=30
+INACTIVITY_THRESHOLD_MINUTES=30
+USER_DELETION_PERIOD=43200 # 30 dias em minutos
+DELETION_GRACE_PERIOD=1440  # 1 dia em minutos
 
-#tempo para marcar como inativo
-INACTIVITY_THRESHOLD_MINUTES = 30
-
-#tempo para a deleção de usuario
-USER_DELETION_PERIOD = 30
-
-#periodo de graça para a deleção de usuario
-DELETION_GRACE_PERIOD = 30
+# Redis (Opcional se configurado localmente)
+REDIS_URL="redis://localhost:6379"
 
 ```
 
-## 🔑 Autenticacao
-- **Header**: Authorization: Bearer <JWT_TOKEN>
-- **Middleware**: authorized para permissões
+## 🔑 Autenticacao e Segurança
+- **Header Requisitado**: Authorization: Bearer <JWT_TOKEN>
+- **Middleware authenticated**: Valida o token e injeta os dados do usuário no req.user
+- **Middleware authorized**: Verifica se o usuário possui a combinação correta de ACTION (Verbo HTTP) e RESOURCE no seu perfil de acesso.
 
 ## 📚 Documentacao das Rotas
 #### Usuarios
@@ -150,8 +169,8 @@ DELETION_GRACE_PERIOD = 30
 |  Método 	| Endpoint | Descrição | Permissão |
 |-----------|----------|-----------|-----------|
 | POST | /stores/:storeId/products/:productId/stocks/movements | Cria movimentação | POST:STOCK |
-|GET | /stores/:storeId/products/:productId/stocks/movements | Lista movimentações | GET:STOCK |
-| POST | /stores/:storeId/products/:productId/stocks/movements/:movementId/revert | Reverte movimentação | POST:STOCK |
+| GET | /stores/:storeId/products/:productId/stocks/movements | Lista movimentações | GET:STOCK |
+| PATCH | /stores/:storeId/products/:productId/stocks/movements/:movementId/revert | Reverte movimentação | POST:STOCK |
 
 #### Auditoria
 
@@ -162,7 +181,25 @@ DELETION_GRACE_PERIOD = 30
 ## 🚨 Tratamento de Erros
 ```bash
 {
-  "error": "Tipo do erro",
-  "message": "Descrição detalhada"
+  "status": "error",
+  "name": "ValidationError | NotFoundError | ForbiddenError",
+  "message": "Mensagem detalhada do erro"
 }
 ```
+## Principais Códigos HTTPs
+
+Principais Códigos HTTP:
+
+- 400 Bad Request: Erros de validação.
+
+- 401 Unauthorized: Token ausente ou inválido.
+
+- 403 Forbidden: Falta de permissão no RBAC ou tentativa de acesso a outra loja.
+
+- 404 Not Found: Recurso não encontrado ou deletado.
+
+- 409 Conflict: Violação de regra de negócio (ex: estoque insuficiente).
+
+- 500 Internal Server Error: Erro inesperado no servidor.
+
+Desenvolvido por Denis Ed Silva 🚀

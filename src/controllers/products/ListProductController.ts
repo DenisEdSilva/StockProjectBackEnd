@@ -2,22 +2,20 @@ import { Request, Response, NextFunction } from "express";
 import { ListProductService } from "../../services/products/ListProductService";
 
 class ListProductController {
+    constructor(private listProductService: ListProductService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId } = req.params;
-            const { 
-                page = 1, 
-                pageSize = 10,
-                search,
-                sku,
-                categoryId
-            } = req.query;
+            const { page, pageSize, search, sku, categoryId } = req.query;
 
-            const service = new ListProductService();
-            const result = await service.execute({ 
-                storeId: parseInt(storeId, 10),
-                page: Number(page),
-                pageSize: Number(pageSize),
+            const result = await this.listProductService.execute({ 
+                storeId: Number(storeId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
+                page: page ? Number(page) : 1,
+                pageSize: pageSize ? Number(pageSize) : 10,
                 search: search as string,
                 sku: sku as string,
                 categoryId: categoryId ? Number(categoryId) : undefined

@@ -2,21 +2,22 @@ import { Request, Response, NextFunction } from "express";
 import { DeleteProductService } from "../../services/products/DeleteProductService";
 
 class DeleteProductController {
+    constructor(private deleteProductService: DeleteProductService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { storeId, categoryId, productId, } = req.params;
-            const performedByUserId = req.user.id;
-    
-            const service = new DeleteProductService();
-            const result = await service.execute({
-                performedByUserId,
-                storeId: parseInt(storeId, 10),
-                categoryId: parseInt(categoryId, 10),
-                productId: parseInt(productId, 10),
+            const { storeId, productId } = req.params;
+
+            const result = await this.deleteProductService.execute({
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
+                storeId: Number(storeId),
+                productId: Number(productId),
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
+
             return res.status(200).json(result);
         } catch (error) {
             next(error);

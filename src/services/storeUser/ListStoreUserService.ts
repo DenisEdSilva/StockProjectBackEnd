@@ -1,71 +1,84 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface ListStoreUserRequest {
     storeId: number;
+    performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     search?: string;
-    page?: number;
-    pageSize?: number;
+    page: number;
+    pageSize: number;
 }
 
 class ListStoreUserService {
-    async execute({ storeId, search, page = 1, pageSize = 10 }: ListStoreUserRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!storeId || isNaN(storeId)) {
-                throw new ValidationError("ID da loja inválido");
-            }
+    async execute(data: ListStoreUserRequest) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
 
-            const store = await tx.store.findUnique({ where: { id: storeId } });
-            if (!store) throw new NotFoundError("Loja não encontrada");
-
-            const whereClause = {
-                storeId,
-                isDeleted: false,
-                ...(search && {
-                    name: {
-                        contains: search,
-                        mode: "insensitive" as const
-                    }
-                })
-            };
-
-            const [storeUsers, total] = await Promise.all([
-                tx.storeUser.findMany({
-                    where: whereClause,
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        storeId: true,
-                        role: {
-                            select: {
-                                name: true
-                            }
-                        }
-                    },
-                    orderBy: { name: "asc" },
-                    skip: (page - 1) * pageSize,
-                    take: pageSize
-                }),
-                tx.storeUser.count({ where: whereClause })
-            ]);
-
-            return {
-                data: storeUsers.map(user => ({
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role.name,
-                    storeId: user.storeId
-                })),
-                pagination: {
-                    page,
-                    pageSize,
-                    total,
-                    totalPages: Math.ceil(total / pageSize)
-                }
-            };
+        const store = await prismaClient.store.findUnique({
+            where: { id: data.storeId, isDeleted: false },
+            select: { ownerId: true }
         });
+
+        if (!store) {
+            throw new NotFoundError("StoreNotFound");
+        }
+
+        if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        const whereClause = {
+            storeId: data.storeId,
+            isDeleted: false,
+            ...(data.search && {
+                name: {
+                    contains: data.search,
+                    mode: "insensitive" as const
+                }
+            })
+        };
+
+        const [storeUsers, total] = await Promise.all([
+            prismaClient.storeUser.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    storeId: true,
+                    role: {
+                        select: { name: true }
+                    }
+                },
+                orderBy: { name: "asc" },
+                skip: (data.page - 1) * data.pageSize,
+                take: data.pageSize
+            }),
+            prismaClient.storeUser.count({ where: whereClause })
+        ]);
+
+        return {
+            data: storeUsers.map(user => ({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role.name,
+                storeId: user.storeId
+            })),
+            pagination: {
+                page: data.page,
+                pageSize: data.pageSize,
+                total,
+                totalPages: Math.ceil(total / data.pageSize)
+            }
+        };
     }
 }
 

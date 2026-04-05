@@ -4,144 +4,148 @@ import {
     ValidationError, 
     NotFoundError, 
     ConflictError, 
-    UnauthorizedError
+    ForbiddenError
 } from "../../errors";
-import { CreateStoreUserAccessControlListService } from "./CreateStoreUserAccessControlListService";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 import { redisClient } from "../../redis.config";
 
 interface UpdateRequest {
     performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     id: number;
     storeId: number;
     name?: string;
     email?: string;
     password?: string;
     roleId?: number;
-    updatedBy: number;
     ipAddress: string;
     userAgent: string;
 }
 
 class UpdateStoreUserService {
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
     async execute(data: UpdateRequest) {
-        const aclService = new CreateStoreUserAccessControlListService();
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
-
             const user = await tx.storeUser.findUnique({
-                where: { id: data.id, storeId: data.storeId }
+                where: { 
+                    id: data.id, 
+                    storeId: data.storeId, 
+                    isDeleted: false 
+                },
+                include: { store: { select: { ownerId: true } } }
             });
 
-            const store = await tx.store.findUnique({
-                where: { id: data.storeId },
-                select: { ownerId: true }
-            });
-
-            const isOwner = store.ownerId === data.performedByUserId;
-
-            if (!isOwner) {
-                const storeUserPerformer = await tx.storeUser.findUnique({
-                    where: {
-                        id: data.performedByUserId,
-                        storeId: data.storeId,
-                        isDeleted: false
-                    }
-                });
-                
-                if (!storeUserPerformer) {
-                    throw new UnauthorizedError("Usuário não autorizado");
-                }
+            if (!user) {
+                throw new NotFoundError("StoreUserNotFound");
             }
-            
-            if (!store) throw new NotFoundError("Loja não encontrada");
 
-            if (!user) throw new NotFoundError("Usuário não encontrado");
-            if (user.isDeleted) throw new NotFoundError("Usuário desativado");
+            if (data.userType === 'OWNER' && user.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
             if (data.email && data.email !== user.email) {
-                const emailExists = await tx.storeUser.findUnique({
-                    where: { email: data.email }
+                const emailInUse = await tx.storeUser.findFirst({
+                    where: { 
+                        email: data.email, 
+                        storeId: data.storeId, 
+                        isDeleted: false 
+                    }
                 });
-                if (emailExists) throw new ConflictError("Email já cadastrado");
+
+                if (emailInUse) {
+                    throw new ConflictError("EmailAlreadyRegisteredInThisStore");
+                }
             }
 
-            if (data.roleId) {
-                const roleExists = await tx.role.findUnique({
-                    where: { id: data.roleId }
+            if (data.roleId && data.roleId !== user.roleId) {
+                const role = await tx.role.findFirst({
+                    where: { 
+                        id: data.roleId, 
+                        storeId: data.storeId, 
+                        isDeleted: false 
+                    }
                 });
-                if (!roleExists) throw new NotFoundError("Perfil não encontrado");
+
+                if (!role) {
+                    throw new NotFoundError("RoleNotFoundInThisStore");
+                }
             }
 
-            const passwordHash = data.password
-                ? await hash(data.password, 12)
-                : user.password;
+            const passwordHash = data.password 
+                ? await hash(data.password, 10) 
+                : undefined;
 
             const updatedUser = await tx.storeUser.update({
                 where: { id: data.id },
                 data: {
-                    name: data.name || user.name,
-                    email: data.email || user.email,
+                    name: data.name || undefined,
+                    email: data.email || undefined,
                     password: passwordHash,
-                    roleId: data.roleId || user.roleId
+                    roleId: data.roleId || undefined
                 },
                 select: {
                     id: true,
                     name: true,
                     email: true,
                     roleId: true,
+                    storeId: true,
                     updatedAt: true
                 }
             });
 
-            const acl = await aclService.execute({ storeUserId: data.id }, tx);
-
-            await redisClient.setEx(
-                `acl:${data.id}`,
-                28800,
-                JSON.stringify(acl)
-            );
-
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
-            
-            await auditLogService.create({
-                action: "USER_UPDATE",
-                details: {
-                    name: data.name || user.name,
-                    email: data.email || user.email
-                },
-                ...(isOwner
-                ? { userId: data.performedByUserId } : {
-                    storeUserId: data.performedByUserId
-                }
-                ),
-                ipAddress: data.ipAddress,
-                userAgent: data.userAgent
+                userId: data.performedByUserId
             });
 
+            await this.auditLogService.create({
+                action: "STORE_USER_UPDATE",
+                details: { 
+                    targetUserId: data.id,
+                    updatedFields: Object.keys(data).filter(k => data[k as keyof UpdateRequest] !== undefined)
+                },
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
+
+            try {
+                await redisClient.del(`store:${data.storeId}:user:${data.id}`);
+            } catch (e) {}
+
             return updatedUser;
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
     }
 
     private validateInput(data: UpdateRequest) {
-        if (!data.id || isNaN(data.id)) throw new ValidationError("ID inválido");
-        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
-        if (data.email && !this.isValidEmail(data.email)) throw new ValidationError("Formato de email inválido");
-        if (data.password && data.password.length < 8) throw new ValidationError("Senha deve ter 8+ caracteres");
-    }
-
-    private isValidEmail(email: string): boolean {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (!Number.isInteger(data.id)) {
+            throw new ValidationError("InvalidUserId");
+        }
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+        if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+            throw new ValidationError("InvalidEmailFormat");
+        }
+        if (data.password && data.password.length < 8) {
+            throw new ValidationError("PasswordTooShort");
+        }
     }
 }
 

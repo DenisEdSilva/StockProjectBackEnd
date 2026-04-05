@@ -1,30 +1,32 @@
 import { Request, Response, NextFunction } from "express";
 import { CreateProductService } from "../../services/products/CreateProductService";
+import { Prisma } from "@prisma/client";
 
 class CreateProductController {
+    constructor(private createProductService: CreateProductService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { banner, name, stock, price, description, categoryId } = req.body;
-            const performedByUserId = req.user.id;
+            const { banner, name, price, description, categoryId } = req.body;
             const { storeId } = req.params;
-    
-            const service = new CreateProductService();
-            const product = await service.execute({
+
+            const product = await this.createProductService.execute({
                 banner,
                 name,
-                stock,
-                price,
+                price: new Prisma.Decimal(price),
                 description,
-                categoryId,
-                storeId: parseInt(storeId, 10),
-                performedByUserId,
+                categoryId: Number(categoryId),
+                storeId: Number(storeId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
+
             return res.status(201).json(product);
         } catch (error) {
-            next(error);    
+            next(error);
         }
     }
 }

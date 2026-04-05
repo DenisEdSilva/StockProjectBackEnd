@@ -1,86 +1,58 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { NotFoundError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface DeleteProductRequest {
-    performedByUserId: number;
-    storeId: number;
-    categoryId: number;
-    productId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class DeleteProductService {
-    async execute({ performedByUserId, storeId, categoryId, productId, ipAddress, userAgent }: DeleteProductRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
         return await prismaClient.$transaction(async (tx) => {
-
-            const isOwner = await tx.store.findUnique({ 
-                where: { 
-                    id: storeId 
-                }, 
-                select: { 
-                    ownerId: true 
-                } 
-            });
-
-            if (!productId || isNaN(productId)) throw new ValidationError("ID do produto inválido");
-
             const product = await tx.product.findUnique({
-                where: { id: productId },
-                include: { stockMoviment: true }
+                where: { id: data.productId, storeId: data.storeId, isDeleted: false },
+                include: { store: { select: { ownerId: true } } }
             });
 
-            if (!product) throw new NotFoundError("Produto não encontrado");
-            if (product.isDeleted) throw new ConflictError("Produto já excluído");
+            if (!product) throw new NotFoundError("ProductNotFound");
+
+            if (data.userType === 'OWNER' && product.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
             await tx.stockMoviment.updateMany({
-                where: { id: { in: product.stockMoviment.map(m => m.id) } },
+                where: { productId: data.productId, isDeleted: false },
                 data: { isDeleted: true, deletedAt: new Date() }
             });
 
             const deletedProduct = await tx.product.update({
-                where: { id: productId },
+                where: { id: data.productId },
                 data: { isDeleted: true, deletedAt: new Date() }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
-
-            const deletedData = await tx.product.findUnique({ 
-                where: { 
-                    id: productId 
-                } 
+                storeId: data.storeId,
+                userId: data.performedByUserId
             });
 
-            await auditLogService.create({
+            await this.auditLogService.create({
                 action: "PRODUCT_DELETE",
-                details: {
-                    deletedData
-                },
-                ...(isOwner ? {
-                    userId: performedByUserId,
-                } : {
-                    storeUserId: performedByUserId
-                }),
-                storeId: product.storeId,
-                ipAddress,
-                userAgent
-            });
+                details: { id: data.productId, name: product.name, sku: product.sku },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
 
-            return { 
-                message: "Produto excluído",
-                deletedAt: deletedProduct.deletedAt
-            };
-        }, {
-            maxWait: 15000,
-            timeout: 15000
+            return { message: "ProductDeletedSuccessfully", deletedAt: deletedProduct.deletedAt };
         });
     }
 }

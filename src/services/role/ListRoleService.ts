@@ -1,58 +1,70 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
-
-interface ListRoleRequest {
-    storeId: number;
-    search?: string;
-    page?: number;
-    pageSize?: number;
-}
+import { ValidationError, ForbiddenError, NotFoundError } from "../../errors";
 
 class ListRoleService {
-    async execute({ storeId, search, page = 1, pageSize = 10 }: ListRoleRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+    async execute(data: any) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
 
-            const store = await tx.store.findUnique({ where: { id: storeId } });
-            if (!store) throw new NotFoundError("Loja não encontrada");
-
-            const whereClause = {
-                storeId,
-                isDeleted: false,
-                ...(search && {
-                    name: {
-                        contains: search,
-                        mode: "insensitive" as const
-                    }
-                })
-            };
-
-            const [roles, total] = await Promise.all([
-                tx.role.findMany({
-                    where: whereClause,
-                    select: {
-                        id: true,
-                        name: true,
-                        createdAt: true,
-                        _count: { select: { StoreUser: true, permissions: true } }
-                    },
-                    orderBy: { name: "asc" },
-                    skip: (page - 1) * pageSize,
-                    take: pageSize
-                }),
-                tx.role.count({ where: whereClause })
-            ]);
-
-            return {
-                data: roles,
-                pagination: {
-                    page,
-                    pageSize,
-                    total,
-                    totalPages: Math.ceil(total / pageSize)
-                }
-            };
+        const store = await prismaClient.store.findUnique({
+            where: { id: data.storeId, isDeleted: false },
+            select: { ownerId: true }
         });
+
+        if (!store) {
+            throw new NotFoundError("StoreNotFound");
+        }
+
+        if (data.userType === 'OWNER' && store.ownerId !== data.userId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        const whereClause = {
+            storeId: data.storeId,
+            isDeleted: false,
+            ...(data.search && {
+                name: {
+                    contains: data.search,
+                    mode: "insensitive" as const
+                }
+            })
+        };
+
+        const [roles, total] = await Promise.all([
+            prismaClient.role.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    name: true,
+                    createdAt: true,
+                    _count: { 
+                        select: { 
+                            StoreUser: { where: { isDeleted: false } }, 
+                            permissions: true 
+                        } 
+                    }
+                },
+                orderBy: { name: "asc" },
+                skip: (data.page - 1) * data.pageSize,
+                take: data.pageSize
+            }),
+            prismaClient.role.count({ where: whereClause })
+        ]);
+
+        return {
+            data: roles,
+            pagination: {
+                page: data.page,
+                pageSize: data.pageSize,
+                total,
+                totalPages: Math.ceil(total / data.pageSize)
+            }
+        };
     }
 }
 

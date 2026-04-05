@@ -1,116 +1,81 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface DeleteCategoryRequest {
-    performedByUserId: number;
-    storeId: number;
-    categoryId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class DeleteCategoryService {
-    async execute({ performedByUserId, storeId, categoryId, ipAddress, userAgent }: DeleteCategoryRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
+        if (!Number.isInteger(data.categoryId)) {
+            throw new ValidationError("InvalidCategoryId");
+        }
+
         return await prismaClient.$transaction(async (tx) => {
-            const isOwner = await tx.store.findUnique({
-                where: {
-                    id: storeId
-                },
-                select: {
-                    ownerId: true
-                }
-            })
-
-            if (!categoryId || isNaN(categoryId)) throw new ValidationError("ID da categoria inválido");
-
             const category = await tx.category.findUnique({
                 where: { 
-                    id: categoryId
+                    id: data.categoryId, 
+                    storeId: data.storeId, 
+                    isDeleted: false 
                 },
-                select: {
-                    id: true,
-                    storeId: true,
-                    isDeleted: true,
-                    products: { 
-                        include: { 
-                            stockMoviment: {
-                                select: {
-                                    id: true
-                                }
-                            },
-                        }
-                    }
+                include: { 
+                    store: { select: { ownerId: true } },
+                    _count: { select: { products: { where: { isDeleted: false } } } }
                 }
             });
 
-            if (!category) throw new NotFoundError("Categoria não encontrada");
-            if (category.isDeleted) throw new ConflictError("Categoria já excluída");
+            if (!category) {
+                throw new NotFoundError("CategoryNotFound");
+            }
 
-            if (category.products.length > 0) {
-                await this.softDeleteProducts(category.products, tx);
+            if (data.userType === 'OWNER' && category.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (category._count.products > 0) {
+                throw new ConflictError("CannotDeleteCategoryWithActiveProducts");
             }
 
             const deletedCategory = await tx.category.update({
-                where: { 
-                    id: categoryId
-                },
+                where: { id: data.categoryId },
                 data: { 
                     isDeleted: true, 
                     deletedAt: new Date() 
                 }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                storeId: storeId,
-                performedByUserId: performedByUserId
-            })
-
-            const deletedData = await tx.category.findUnique({ where: { id: category.id } });
-
-            await auditLogService.create({
-                action: "CATEGORY_DELETE",
-                details: {
-                    deletedData,
-                },
-                ...(isOwner ? {
-                    userId: performedByUserId,
-                } : {
-                    storeUserId: performedByUserId
-                }),
-                storeId: category.storeId,
-                ipAddress,
-                userAgent
+                storeId: data.storeId,
+                userId: data.performedByUserId
             });
 
+            await this.auditLogService.create({
+                action: "CATEGORY_DELETE",
+                details: { 
+                    categoryId: data.categoryId, 
+                    name: category.name 
+                },
+                storeId: data.storeId,
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
+
             return { 
-                message: "Categoria e produtos marcados para exclusão",
-                deletedAt: deletedCategory.deletedAt
+                message: "CategoryDeletedSuccessfully",
+                deletedAt: deletedCategory.deletedAt 
             };
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
-    }
-
-    private async softDeleteProducts(products: any[], tx: any) {
-        const productIds = products.map(p => p.id);
-        const movimentIds = products.flatMap(p => p.stockMoviment.map(m => m.id));
-
-        await Promise.all([
-            tx.product.updateMany({
-                where: { id: { in: productIds } },
-                data: { isDeleted: true, deletedAt: new Date() }
-            }),
-            tx.stockMoviment.updateMany({
-                where: { id: { in: movimentIds } },
-                data: { isDeleted: true, deletedAt: new Date() }
-            })
-        ]);
     }
 }
 

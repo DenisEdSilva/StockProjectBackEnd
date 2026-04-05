@@ -1,8 +1,9 @@
 import prismaClient from "../../prisma";
 import { hash } from "bcryptjs";
 import { ConflictError, ValidationError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
-interface UserRequest {
+interface CreateUserRequest {
     name: string;
     email: string;
     password: string;
@@ -11,21 +12,22 @@ interface UserRequest {
 }
 
 class CreateUserService {
-    async execute(data: UserRequest) {
+    constructor(private auditLogService: CreateAuditLogService) {}
+
+    async execute(data: CreateUserRequest) {
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
-            
-            const userAlreadyExists = await prismaClient.user.findFirst({
-                where: {
-                    email: data.email,
-                },
+            const userAlreadyExists = await tx.user.findFirst({
+                where: { email: data.email, isDeleted: false },
+                select: { id: true }
             });
 
             if (userAlreadyExists) {
-                throw new ConflictError("User already exists");
-            };
+                throw new ConflictError("EmailAlreadyInUse");
+            }
 
-            const passwordHash = await hash(data.password, 8);
+            const passwordHash = await hash(data.password, 10);
 
             const newUser = await tx.user.create({
                 data: {
@@ -34,38 +36,40 @@ class CreateUserService {
                     password: passwordHash,
                     isOwner: true,
                 },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    isOwner: true
+                select: { 
+                    id: true, 
+                    name: true, 
+                    email: true, 
+                    isOwner: true 
                 }
             });
 
-            return newUser
+            await this.auditLogService.create({
+                action: "USER_CREATED",
+                userId: newUser.id,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: true
+            }, tx);
+
+            return newUser;
         });
     }
-    private validateInput(data: UserRequest) {
-        if (!data.name?.trim()) throw new ValidationError("Nome de usuario inválido");
-        if (data.name.trim().length < 3) throw new Error("Nome deve possuir pelo menos 3 caracteres");
-        if (!data.email?.trim()) throw new Error("Email invalido");
-        if (!data.email || !this.isValidEmail(data.email)) {
-            throw new Error("Formato de email invalido");
-        }
-        if (!data.password?.trim()) throw new Error("Senha invalida");
-        if (!this.isValidPassword(data.password)) throw new Error("A senha deve conter letras e números");
-        if (!data.password || data.password.length < 6) {
-            throw new Error("Senha deve possuir pelo menos 6 caracteres");
-        }
-    }
 
-    private isValidEmail(email: string): boolean {
+    private validateInput(data: CreateUserRequest) {
+        if (!data.name || typeof data.name !== 'string' || data.name.trim().length < 3) {
+            throw new ValidationError("InvalidName");
+        }
+        
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
-
-    private isValidPassword(password: string): boolean {
-        return /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+        if (!data.email || !emailRegex.test(data.email)) {
+            throw new ValidationError("InvalidEmail");
+        }
+        
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!data.password || !passwordRegex.test(data.password)) {
+            throw new ValidationError("InvalidPasswordRequirements");
+        }
     }
 }
 

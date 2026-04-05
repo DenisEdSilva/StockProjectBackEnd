@@ -1,80 +1,91 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface StoreRequest {
-    performedByUserId: number;
-    name: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    ownerId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class CreateStoreService {
-    async execute(data: StoreRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker
-        return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
 
+    async execute(data: any) {
+        if (data.userType !== 'OWNER') {
+            throw new ForbiddenError("OnlyOwnersCanCreateStores");
+        }
+
+        this.validateInput(data);
+
+        return await prismaClient.$transaction(async (tx) => {
             const ownerExists = await tx.user.findUnique({
-                where: { id: data.ownerId },
+                where: { 
+                    id: data.performedByUserId, 
+                    isDeleted: false 
+                },
                 select: { id: true }
             });
 
-            if (!ownerExists) throw new NotFoundError("Proprietário não encontrado");
+            if (!ownerExists) {
+                throw new NotFoundError("OwnerNotFound");
+            }
+
+            const storeExists = await tx.store.findFirst({
+                where: { 
+                    name: data.name, 
+                    ownerId: data.performedByUserId, 
+                    isDeleted: false 
+                }
+            });
+
+            if (storeExists) {
+                throw new ConflictError("StoreNameAlreadyExists");
+            }
 
             const newStore = await tx.store.create({
                 data: {
                     name: data.name,
                     city: data.city,
                     state: data.state,
-                    zipCode: data.zipCode,
-                    ownerId: data.ownerId
-                },
+                    zipCode: data.zipCode.replace(/\D/g, ''),
+                    ownerId: data.performedByUserId
+                }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
-                performedByUserId: data.performedByUserId
-            })
+                userId: data.performedByUserId
+            });
 
-            await auditLogService.create(
-                {
-                    action: "STORE_CREATE",
-                    details: {
-                        storeId: newStore.id,
-                        ownerId: data.ownerId,
-                        storeName: data.name,
-                        storeCity: data.city,
-                        storeState: data.state,
-                        storeZipCode: data.zipCode
-                    },
-                    userId: data.performedByUserId,
-                    storeId: newStore.id,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
-                },
-                tx
-            );
+            await this.auditLogService.create({
+                action: "STORE_CREATE",
+                userId: data.performedByUserId,
+                storeId: newStore.id,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: true,
+                details: {
+                    name: data.name,
+                    city: data.city
+                }
+            }, tx);
 
             return newStore;
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
     }
 
-    private validateInput(data: StoreRequest) {
-        if (!data.name?.trim()) throw new ValidationError("Nome da loja inválido");
-        if (!data.city?.trim()) throw new ValidationError("Cidade inválida");
-        if (!data.state?.trim()) throw new ValidationError("Estado inválido");
-        if (!data.zipCode?.trim()) throw new ValidationError("CEP inválido");
-        if (!data.ownerId || isNaN(data.ownerId)) throw new ValidationError("ID do proprietário inválido");
+    private validateInput(data: any) {
+        if (!data.name?.trim()) {
+            throw new ValidationError("InvalidStoreName");
+        }
+        if (!data.city?.trim()) {
+            throw new ValidationError("InvalidCity");
+        }
+        if (data.state?.length !== 2) {
+            throw new ValidationError("InvalidStateCode");
+        }
+        if (!/^\d{5}-?\d{3}$/.test(data.zipCode)) {
+            throw new ValidationError("InvalidZipCode");
+        }
     }
 }
 

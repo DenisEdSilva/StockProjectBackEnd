@@ -1,28 +1,17 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
-
-interface ListStoreRequest {
-    ownerId: number;
-}
+import { ForbiddenError } from "../../errors";
 
 class ListStoreService {
-    async execute(data: ListStoreRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!data.ownerId || isNaN(data.ownerId)) {
-                throw new ValidationError("ID do proprietário inválido");
+    async execute(data: any) {
+        if (data.userType === 'STORE_USER') {
+            if (!data.tokenStoreId) {
+                throw new ForbiddenError("StoreContextMissing");
             }
 
-            const owner = await tx.user.findUnique({
-                where: { id: data.ownerId },
-                select: { id: true }
-            });
-
-            if (!owner) throw new NotFoundError("Proprietário não encontrado");
-
-            return await tx.store.findMany({
+            const store = await prismaClient.store.findUnique({
                 where: { 
-                    ownerId: data.ownerId,
-                    isDeleted: false
+                    id: data.tokenStoreId, 
+                    isDeleted: false 
                 },
                 select: {
                     id: true,
@@ -32,16 +21,39 @@ class ListStoreService {
                     zipCode: true,
                     _count: {
                         select: {
-                            products: true,
-                            categories: true,
-                            storeUsers: true
+                            products: { where: { isDeleted: false } },
+                            categories: { where: { isDeleted: false } },
+                            storeUsers: { where: { isDeleted: false } }
                         }
                     }
-                },
-		        orderBy: {
-                    name: 'asc'
                 }
             });
+
+            return store ? [store] : [];
+        }
+
+        return await prismaClient.store.findMany({
+            where: { 
+                ownerId: data.userId, 
+                isDeleted: false 
+            },
+            select: {
+                id: true,
+                name: true,
+                city: true,
+                state: true,
+                zipCode: true,
+                _count: {
+                    select: {
+                        products: { where: { isDeleted: false } },
+                        categories: { where: { isDeleted: false } },
+                        storeUsers: { where: { isDeleted: false } }
+                    }
+                }
+            },
+            orderBy: {
+                name: 'asc'
+            }
         });
     }
 }

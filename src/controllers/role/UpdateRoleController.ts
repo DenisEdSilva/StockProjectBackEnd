@@ -2,26 +2,28 @@ import { Request, Response, NextFunction } from "express";
 import { UpdateRoleService } from "../../services/role/UpdateRoleService";
 
 class UpdateRoleController {
+    constructor(private updateRoleService: UpdateRoleService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const performedByUserId = req.user.id;
             const { storeId, roleId } = req.params;
             const { name, permissionIds } = req.body;
-    
-            const updateRoleService = new UpdateRoleService();
-            const role = await updateRoleService.execute({ 
-                performedByUserId,
-                storeId: parseInt(storeId, 10),
-                roleId: parseInt(roleId, 10),
-                name, 
+
+            const role = await this.updateRoleService.execute({
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
+                storeId: Number(storeId),
+                roleId: Number(roleId),
+                name,
                 permissionIds,
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
+
             return res.status(200).json(role);
         } catch (error) {
-            next(error);   
+            next(error);
         }
     }
 }

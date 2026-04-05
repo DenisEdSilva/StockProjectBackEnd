@@ -1,74 +1,80 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, ForbiddenError, NotFoundError } from "../../errors";
 
 interface ListProductRequest {
     storeId: number;
+    performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     search?: string;
     sku?: string;
     categoryId?: number;
-    page?: number;
-    pageSize?: number;
+    page: number;
+    pageSize: number;
 }
 
 class ListProductService {
-    async execute({ storeId, search, sku, categoryId, page = 1, pageSize = 10 }: ListProductRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+    async execute(data: ListProductRequest) {
+        if (!Number.isInteger(data.storeId)) throw new ValidationError("InvalidStoreId");
 
-            const store = await tx.store.findUnique({ where: { id: storeId } });
-            if (!store) throw new NotFoundError("Loja não encontrada");
-
-            const whereClause = {
-                storeId,
-                isDeleted: false,
-                ...(search && {
-                    name: {
-                        contains: search,
-                        mode: "insensitive" as const
-                    }
-                }),
-                ...(sku && {
-                    sku: {
-                        contains: sku,
-                        mode: "insensitive" as const
-                    }
-                }),
-                ...(categoryId && { categoryId: Number(categoryId) })
-            };
-
-            const [products, total] = await Promise.all([
-                tx.product.findMany({
-                    where: whereClause,
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                        price: true,
-                        stock: true,
-                        banner: true,
-                        sku: true,
-                        categoryId: true,
-                        category: { select: { name: true } },
-                        createdAt: true,
-                        updatedAt: true
-                    },
-                    orderBy: { name: 'asc' },
-                    skip: (page - 1) * pageSize,
-                    take: pageSize
-                }),
-                tx.product.count({ where: whereClause })
-            ]);
-
-            return {
-                data: products,
-                pagination: {
-                    page,
-                    pageSize,
-                    total,
-                    totalPages: Math.ceil(total / pageSize)
-                }
-            };
+        const store = await prismaClient.store.findUnique({
+            where: { id: data.storeId, isDeleted: false },
+            select: { ownerId: true }
         });
+
+        if (!store) {
+            throw new NotFoundError("StoreNotFound");
+        }
+
+        if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        const whereClause = {
+            storeId: data.storeId,
+            isDeleted: false,
+            ...(data.search && {
+                name: { contains: data.search, mode: "insensitive" as const }
+            }),
+            ...(data.sku && {
+                sku: { contains: data.sku, mode: "insensitive" as const }
+            }),
+            ...(data.categoryId && { categoryId: Number(data.categoryId) })
+        };
+
+        const [products, total] = await Promise.all([
+            prismaClient.product.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    stock: true,
+                    banner: true,
+                    sku: true,
+                    category: { select: { name: true } },
+                    createdAt: true
+                },
+                orderBy: { name: 'asc' },
+                skip: (data.page - 1) * data.pageSize,
+                take: data.pageSize
+            }),
+            prismaClient.product.count({ where: whereClause })
+        ]);
+
+        return {
+            data: products,
+            pagination: {
+                page: data.page,
+                pageSize: data.pageSize,
+                total,
+                totalPages: Math.ceil(total / data.pageSize)
+            }
+        };
     }
 }
 

@@ -1,52 +1,45 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
-interface GetProductByIdRequest {
+interface GetProductRequest {
     storeId: number;
     id: number;
+    performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
 }
 
 class GetProductByIdService {
-    async execute(data: GetProductByIdRequest) {
-        return await prismaClient.$transaction(async (tx) => {
+    async execute(data: GetProductRequest) {
+        if (!Number.isInteger(data.id) || !Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidIdsProvided");
+        }
 
-            if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
-            
-            if (!data.id || isNaN(data.id)) throw new ValidationError("ID do produto inválido");
-
-
-            const store = await tx.store.findUnique({ where: { 
-                id: data.storeId,
+        const product = await prismaClient.product.findUnique({ 
+            where: {
+                id: data.id,
+                storeId: data.storeId,
                 isDeleted: false
-            }});
-        
-            if (!store) throw new NotFoundError("Loja nao encontrada");
+            },
+            include: {
+                category: { select: { name: true } },
+                store: { select: { ownerId: true } }
+            }
+        });
 
-            const product = await tx.product.findUnique({ 
-                where: {
-                    id: data.id,
-                    storeId: data.storeId,
-                    isDeleted: false
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    price: true,
-                    stock: true,
-                    banner: true,
-                    sku: true,
-                    categoryId: true,
-                    createdAt: true,
-                    category: { select: { name: true } }
-                }
-            });
+        if (!product) throw new NotFoundError("ProductNotFound");
 
-            if (!product) throw new NotFoundError("Produto nao encontrado");
+        if (data.userType === 'OWNER' && product.store.ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
 
-            return product
-        })
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        const { store, ...productData } = product;
+        return productData;
     }
 }
 
-export { GetProductByIdService }
+export { GetProductByIdService };

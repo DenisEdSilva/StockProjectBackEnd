@@ -1,13 +1,20 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
 
 class ListPermissionService {
     async execute() {
-        return await prismaClient.$transaction(async (tx) => {
-            return await tx.permission.findMany({
-                orderBy: { id: 'asc' }
-            });
-        })
+        const permissions = await prismaClient.permission.findMany({
+            select: {
+                id: true,
+                name: true,
+                action: true,
+                resource: true
+            },
+            orderBy: {
+                id: 'asc'
+            }
+        });
+
+        return permissions;
     }
 }
 

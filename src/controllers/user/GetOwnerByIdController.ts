@@ -1,18 +1,22 @@
 import { Request, Response, NextFunction } from "express";
 import { GetOwnerByIdService } from "../../services/user/GetOwnerByIdService";
 
-export class GetOwnerByIdController {
+class GetOwnerByIdController {
+    constructor(private getOwnerByIdService: GetOwnerByIdService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const ownerId = parseInt(req.params.ownerId, 10);
-
-            const getOwnerByIdService = new GetOwnerByIdService();
-            const owner = await getOwnerByIdService.execute({
-                ownerId
+            const result = await this.getOwnerByIdService.execute({
+                ownerId: Number(req.params.ownerId),
+                performedByUserId: req.user.id,
+                userType: req.user.type
             });
-            return res.json(owner);
-        } catch (error) {
-            next(error);
+
+            return res.status(200).json(result);
+        } catch (error) { 
+            next(error); 
         }
     }
 }
+
+export { GetOwnerByIdController };

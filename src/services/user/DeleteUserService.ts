@@ -1,82 +1,65 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../errors";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
 interface DeleteUserRequest {
     id: number;
+    performedByUserId: number;
+    userType: string;
+    ipAddress: string;
+    userAgent: string;
 }
 
 class DeleteUserService {
-    async execute({ id }: DeleteUserRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!id || isNaN(id)) {
-                throw new ValidationError("ID de usuário inválido");
-            }
+    constructor(private auditLogService: CreateAuditLogService) {}
 
+    async execute(data: DeleteUserRequest) {
+        if (!Number.isInteger(data.id) || data.id !== data.performedByUserId || data.userType !== 'OWNER') {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        return await prismaClient.$transaction(async (tx) => {
             const user = await tx.user.findUnique({
-                where: { id },
-                include: {
-                    ownedStores: {
-                        include: {
-                            categories: true,
-                            products: true,
-                            stockMovimentsOrigin: true,
-                            stockMovimentsDestination: true,
-                            StockMovimentStore: true
-                        }
-                    }
-                }
+                where: { id: data.id, isDeleted: false },
+                select: { id: true, markedForDeletionAt: true }
             });
 
             if (!user) {
-                throw new NotFoundError("Usuário não encontrado");
+                throw new NotFoundError("UserNotFound");
             }
 
-            if (!user.isOwner) {
-                throw new ForbiddenError("Usuários proprietários requerem um processo de exclusão especial");
+            if (user.markedForDeletionAt) {
+                throw new ConflictError("UserAlreadyMarkedForDeletion");
             }
 
-            const gracePeriod = process.env.DELETION_GRACE_PERIOD 
-                ? parseInt(process.env.DELETION_GRACE_PERIOD)
-                : 30;
+            const gracePeriodStr = process.env.DELETION_GRACE_PERIOD;
+            const gracePeriod = gracePeriodStr ? parseInt(gracePeriodStr, 10) : 30;
 
-            if (isNaN(gracePeriod)) {
-                throw new ValidationError("Período de graça para exclusão inválido");
+            if (!Number.isInteger(gracePeriod) || gracePeriod < 0) {
+                throw new ValidationError("InvalidGracePeriodConfig");
             }
 
             const deletionDate = new Date();
             deletionDate.setMinutes(deletionDate.getMinutes() + gracePeriod);
 
             await tx.user.update({
-                where: { id },
-                data: { markedForDeletionAt: deletionDate }
-            });
-
-            await Promise.all([
-                prismaClient.user.update({
-                    where: { 
-                        id: user.id 
-                    },
-                    data: { 
-                        lastActivityAt: new Date() 
-                    }
-                })
-            ])   
-
-            await tx.auditLog.create({
-                data: {
-                    action: "USER_MARKED_FOR_DELETION",
-                    details: JSON.stringify({ userId: id, scheduledDeletion: deletionDate }),
-                    userId: id,
-                    ipAddress: "system",
-                    userAgent: "cron-job",
-                    isOwner: true
+                where: { id: data.id },
+                data: { 
+                    markedForDeletionAt: deletionDate,
+                    lastActivityAt: new Date()
                 }
             });
 
-            return { 
-                message: "Usuário marcado para exclusão",
-                scheduledDeletion: deletionDate 
-            };
+            await this.auditLogService.create({
+                action: "USER_MARKED_FOR_DELETION",
+                details: { scheduledDeletion: deletionDate.toISOString() },
+                userId: data.id,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: true
+            }, tx);
+
+            return { scheduledDeletion: deletionDate };
         });
     }
 }

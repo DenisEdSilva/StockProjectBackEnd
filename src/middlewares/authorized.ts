@@ -1,38 +1,37 @@
 import { Request, Response, NextFunction } from "express";
 import { UnauthorizedError, ForbiddenError } from "../errors";
 
-interface UserCache {
-    id: number;
-    isOwner: boolean;
-    permissions: Array<{
-        action: string;
-        resource: string;
-    }>;
-}
-
 export function authorized(action: string, resource: string) {
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const requiredPermission = `${action.toUpperCase()}_${resource.toUpperCase()}`;
+
+    return (req: Request, res: Response, next: NextFunction): void => {
         try {
-            if (req.user.type === "owner") {
+            const user = req.user;
+
+            if (user.type === 'OWNER') {
                 return next();
             }
 
-            if (!req.user.id || isNaN(req.user.id)) {
-                throw new UnauthorizedError("Identificação de usuário inválida");
+            if (!user.id || !user.permissions || !Array.isArray(user.permissions)) {
+                throw new UnauthorizedError("InvalidOrMissingPermissions");
             }
 
-            const requiredPermission = `${action.toUpperCase()}_${resource.toUpperCase()}`;
-            const hasPermission = (req.user.permissions?.some(p => 
-                `${action.toUpperCase()}_${resource.toUpperCase()}` === requiredPermission
-            ) || []);
+            const hasPermission = user.permissions.some(
+                p => `${p.action.toUpperCase()}_${p.resource.toUpperCase()}` === requiredPermission
+            );
 
             if (!hasPermission) {
-                throw new ForbiddenError("Acesso não autorizado para este recurso");
+                throw new ForbiddenError("ForbiddenAccess");
             }
 
+            console.log('--- CHECK PERMISSION ---');
+            console.log('Metodo Requisitado:', req.method);
+            console.log('Recurso Requisitado:', resource);
+            console.log('Permissões do Usuário:', JSON.stringify(user.permissions));
+
             next();
-        } catch (error) {
-            next(error);
+        } catch (err) {
+            next(err);
         }
     };
 }

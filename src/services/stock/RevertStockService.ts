@@ -1,258 +1,173 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ConflictError } from "../../errors";
+import { Prisma, StockMovimentType } from "@prisma/client";
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface StockRequest {
-    movementId: number;
-    storeId: number;
+interface RevertParams {
+    movementId: string | number;
+    storeId: string | number;
     performedByUserId: number;
-    ipAddress: string;
-    userAgent: string;
+    userType: 'OWNER' | 'STORE_USER';
+    tokenStoreId?: number;
+    ipAddress?: string;
+    userAgent?: string;
 }
 
 class RevertStockService {
-    async execute(data: StockRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
-        
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(params: RevertParams) {
+        const data = this.validateAndTransform(params);
+
         return await prismaClient.$transaction(async (tx) => {
-            const storeOwner = await tx.store.findUnique({ 
-                where: { id: data.storeId }, 
-                select: { ownerId: true } 
+            const store = await tx.store.findUnique({
+                where: { id: data.storeId, isDeleted: false },
+                select: { id: true, ownerId: true }
             });
 
-            if (!storeOwner) throw new NotFoundError("Loja não encontrada");
-            
-            const isOwner = data.performedByUserId === storeOwner.ownerId;
+            if (!store) throw new NotFoundError("StoreNotFound");
 
-            if (!data.movementId || isNaN(data.movementId)) {
-                throw new ValidationError("ID da movimentação inválido");
-            }
+            this.checkAuthorization(data, store.ownerId);
 
-            if (!data.performedByUserId) {
-                throw new ValidationError("Usuário responsável não informado");
-            }
-
-            const wrongMovement = await tx.stockMoviment.findUnique({
+            const movement = await tx.stockMoviment.findUnique({
                 where: { id: data.movementId },
-                include: { 
-                    product: true,
-                    store: true,
-                    destinationStore: true
-                }
+                include: { product: true }
             });
 
-            if (!wrongMovement) throw new NotFoundError("Movimentação não encontrada");
-            if (!wrongMovement.isValid) throw new ConflictError("Movimentação já revertida");
-            if (!wrongMovement.product) throw new NotFoundError("Produto relacionado não encontrado");
+            if (!movement || movement.isDeleted) throw new NotFoundError("MovementNotFound");
+            if (!movement.isValid) throw new ConflictError("MovementAlreadyReverted");
+            if (movement.storeId !== data.storeId) throw new ForbiddenError("MovementDoesNotBelongToStore");
 
-            if (wrongMovement.type === 'transferencia') {
-                return await this.handleTransferRevert(
-                    tx, 
-                    data, 
-                    wrongMovement, 
-                    auditLogService, 
-                    activityTracker, 
-                    isOwner
-                );
+            if (movement.type === StockMovimentType.TRANSFER) {
+                return await this.handleTransferRevert(tx, data, movement, store.ownerId);
             }
 
-            return await this.handleStandardRevert(
-                tx,
-                data,
-                wrongMovement,
-                auditLogService,
-                activityTracker,
-                isOwner
-            );
+            return await this.handleStandardRevert(tx, data, movement, store.ownerId);
         });
     }
 
-    private async handleStandardRevert(
-        tx: any,
-        data: StockRequest,
-        wrongMovement: any,
-        auditLogService: CreateAuditLogService,
-        activityTracker: ActivityTracker,
-        isOwner: boolean
-    ) {
-        const reverseType = wrongMovement.type === 'entrada' ? 'saida' : 'entrada';
-        const reverseAmount = wrongMovement.type === 'entrada' ? -wrongMovement.stock : wrongMovement.stock;
+    private async handleStandardRevert(tx: Prisma.TransactionClient, data: any, movement: any, ownerId: number) {
+        const reverseType = movement.type === StockMovimentType.IN 
+            ? StockMovimentType.OUT 
+            : StockMovimentType.IN;
 
-        if (reverseType === 'saida' && wrongMovement.product.stock < wrongMovement.stock) {
-            throw new ConflictError("Estoque insuficiente para reverter a movimentação");
-        }
-
-        const newMoviment = await tx.stockMoviment.create({
+        const updated = await tx.product.updateMany({
+            where: {
+                id: movement.productId,
+                storeId: movement.storeId,
+                isDeleted: false,
+                ...(reverseType === StockMovimentType.OUT && { stock: { gte: movement.stock } })
+            },
             data: {
-                productId: wrongMovement.productId,
+                stock: reverseType === StockMovimentType.IN 
+                    ? { increment: movement.stock } 
+                    : { decrement: movement.stock }
+            }
+        });
+
+        if (updated.count === 0) throw new ConflictError("InsufficientStockToRevert");
+
+        await tx.stockMoviment.update({
+            where: { id: movement.id },
+            data: { isValid: false }
+        });
+
+        const newMovement = await tx.stockMoviment.create({
+            data: {
+                productId: movement.productId,
                 type: reverseType,
-                stock: wrongMovement.stock,
-                storeId: wrongMovement.storeId,
+                stock: movement.stock,
+                previousStock: movement.product.stock,
+                storeId: movement.storeId,
                 isValid: true,
                 createdBy: data.performedByUserId
             }
         });
 
-        await Promise.all([
-            tx.product.update({
-                where: { id: wrongMovement.productId },
-                data: { stock: { increment: reverseAmount } }
-            }),
-            
-            tx.stockMoviment.update({
-                where: { id: data.movementId },
-                data: { isValid: false }
-            })
-        ]);
+        await this.finalizeRevert(tx, data, movement.id, newMovement.id, ownerId);
 
-        await activityTracker.track({
-            tx,
-            storeId: data.storeId,
-            performedByUserId: data.performedByUserId
-        });
-
-        await auditLogService.create({
-            action: "STOCK_REVERT",
-            details: {
-                originalMovementId: wrongMovement.id,
-                reverseMovementId: newMoviment.id,
-                productId: wrongMovement.productId,
-                amount: wrongMovement.stock,
-                storeId: wrongMovement.storeId,
-                type: wrongMovement.type
-            },
-            ...(isOwner ? { userId: data.performedByUserId } : { storeUserId: data.performedByUserId }),
-            storeId: wrongMovement.storeId,
-            ipAddress: data.ipAddress,
-            userAgent: data.userAgent
-        });
-
-        return { 
-            message: "Movimentação revertida com sucesso",
-            newStock: wrongMovement.product.stock + reverseAmount,
-            reverseMovementId: newMoviment.id
-        };
+        return { message: "MovementRevertedSuccessfully", id: newMovement.id };
     }
 
-    private async handleTransferRevert(
-        tx: any,
-        data: StockRequest,
-        wrongMovement: any,
-        auditLogService: CreateAuditLogService,
-        activityTracker: ActivityTracker,
-        isOwner: boolean
-    ) {
-        if (!wrongMovement.destinationStoreId) {
-            throw new ValidationError("Movimentação de transferência sem loja de destino");
+    private async handleTransferRevert(tx: Prisma.TransactionClient, data: any, movement: any, ownerId: number) {
+        if (!movement.destinationStoreId) {
+            throw new ValidationError("InvalidTransferMovement");
         }
 
-        const relatedMoviment = await tx.stockMoviment.findFirst({
+        const updateDest = await tx.product.updateMany({
             where: {
-                OR: [
-                    { id: wrongMovement.relatedMovementId },
-                    {
-                        AND: [
-                            { storeId: wrongMovement.destinationStoreId },
-                            { productId: wrongMovement.productId },
-                            { stock: wrongMovement.stock },
-                            { createdAt: { gte: new Date(wrongMovement.createdAt.getTime() - 60000) } },
-                            { createdAt: { lte: new Date(wrongMovement.createdAt.getTime() + 60000) } }
-                        ]
-                    }
-                ]
+                sku: movement.product.sku,
+                storeId: movement.destinationStoreId,
+                stock: { gte: movement.stock },
+                isDeleted: false
             },
-            include: {
-                product: true
+            data: {
+                stock: { decrement: movement.stock }
             }
         });
 
-        if (!relatedMoviment) throw new NotFoundError("Movimentação relacionada não encontrada");
-        if (!relatedMoviment.isValid) throw new ConflictError("Movimentação relacionada já revertida");
-
-        const destinationProduct = await tx.product.findUnique({
-            where: {
-                id_storeId: {
-                    id: wrongMovement.productId,
-                    storeId: relatedMoviment.storeId
-                }
-            }
-        });
-
-        if (!destinationProduct) throw new NotFoundError("Produto não encontrado na loja de destino");
-        if (destinationProduct.stock < relatedMoviment.stock) {
-            throw new ConflictError("Estoque insuficiente na loja de destino para reverter");
+        if (updateDest.count === 0) {
+            throw new ConflictError("InsufficientStockInDestinationStore");
         }
 
-        await Promise.all([
-            tx.stockMoviment.update({
-                where: { id: wrongMovement.id },
-                data: { isValid: false }
-            }),
-            tx.stockMoviment.update({
-                where: { id: relatedMoviment.id },
-                data: { isValid: false }
-            }),
-
-            tx.product.update({
-                where: {
-                    id_storeId: {
-                        id: wrongMovement.productId,
-                        storeId: wrongMovement.storeId
-                    }
-                },
-                data: {
-                    stock: {
-                        increment: wrongMovement.stock
-                    }
-                }
-            }),
-            tx.product.update({
-                where: {
-                    id_storeId: {
-                        id: wrongMovement.productId,
-                        storeId: relatedMoviment.storeId
-                    }
-                },
-                data: {
-                    stock: {
-                        decrement: relatedMoviment.stock
-                    }
-                }
-            })
-        ]);
-
-        await activityTracker.track({
-            tx,
-            storeId: data.storeId,
-            performedByUserId: data.performedByUserId
+        await tx.product.update({
+            where: { id: movement.productId },
+            data: { stock: { increment: movement.stock } }
         });
 
-        await auditLogService.create({
-            action: "STOCK_TRANSFER_REVERT",
-            details: {
-                originalMovementId: wrongMovement.id,
-                relatedMovementId: relatedMoviment.id,
-                productId: wrongMovement.productId,
-                amount: wrongMovement.stock,
-                originStoreId: wrongMovement.storeId,
-                destinationStoreId: relatedMoviment.storeId,
-                originProductStock: wrongMovement.product.stock + wrongMovement.stock,
-                destinationProductStock: destinationProduct.stock - relatedMoviment.stock
-            },
-            ...(isOwner ? { userId: data.performedByUserId } : { storeUserId: data.performedByUserId }),
+        await tx.stockMoviment.update({
+            where: { id: movement.id },
+            data: { isValid: false }
+        });
+
+        if (movement.relatedMovementId) {
+            await tx.stockMoviment.update({
+                where: { id: movement.relatedMovementId },
+                data: { isValid: false }
+            });
+        }
+
+        await this.finalizeRevert(tx, data, movement.id, null, ownerId);
+
+        return { message: "TransferRevertedSuccessfully" };
+    }
+
+    private async finalizeRevert(tx: Prisma.TransactionClient, data: any, oldId: number, newId: number | null, ownerId: number) {
+        await this.activityTracker.track({ tx, storeId: data.storeId });
+
+        await this.auditLogService.create({
+            action: "STOCK_REVERT",
+            details: { originalId: oldId, revertId: newId },
             storeId: data.storeId,
+            userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+            storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
             ipAddress: data.ipAddress,
-            userAgent: data.userAgent
-        });
+            userAgent: data.userAgent,
+            isOwner: data.userType === 'OWNER'
+        }, tx);
+    }
 
-        return {
-            message: "Transferência revertida com sucesso",
-            originStock: wrongMovement.product.stock + wrongMovement.stock,
-            destinationStock: destinationProduct.stock - relatedMoviment.stock,
-            invalidatedMovements: [wrongMovement.id, relatedMoviment.id]
-        };
+    private validateAndTransform(p: RevertParams) {
+        const movementId = Number(p.movementId);
+        const storeId = Number(p.storeId);
+
+        if (isNaN(movementId)) throw new ValidationError("InvalidMovementId");
+        if (isNaN(storeId)) throw new ValidationError("InvalidStoreId");
+
+        return { ...p, movementId, storeId };
+    }
+
+    private checkAuthorization(data: any, ownerId: number) {
+        if (data.userType === 'OWNER' && ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
     }
 }
 

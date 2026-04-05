@@ -2,23 +2,26 @@ import { Request, Response, NextFunction } from "express";
 import { RevertStockService } from "../../services/stock/RevertStockService";
 
 class RevertStockController {
+    constructor(private revertStockService: RevertStockService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { movementId, storeId } = req.params;
-            const performedByUserId = req.user.id;
-    
-            const service = new RevertStockService();
-            const result = await service.execute({
+            const { id: performedByUserId, type: userType, storeId: tokenStoreId } = req.user;
+
+            const result = await this.revertStockService.execute({
+                movementId,
+                storeId,
                 performedByUserId,
-                movementId: parseInt(movementId, 10),
-                storeId: parseInt(storeId, 10),
+                userType,
+                tokenStoreId,
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"]
             });
-    
+
             return res.status(200).json(result);
         } catch (error) {
-            next(error);    
+            next(error);
         }
     }
 }

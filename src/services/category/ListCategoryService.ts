@@ -1,61 +1,78 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError } from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface ListCategoryRequest {
     storeId: number;
+    performedByUserId: number;
+    userType: string;
+    tokenStoreId?: number;
     search?: string;
-    page?: number;
-    pageSize?: number;
+    page: number;
+    pageSize: number;
 }
 
 class ListCategoryService {
-    async execute({ storeId, search, page = 1, pageSize = 10 }: ListCategoryRequest) {
-        return await prismaClient.$transaction(async (tx) => {
-            if (!storeId || isNaN(storeId)) throw new ValidationError("ID da loja inválido");
+    async execute(data: ListCategoryRequest) {
+        if (!Number.isInteger(data.storeId)) throw new ValidationError("InvalidStoreId");
 
-            const store = await tx.store.findUnique({ where: { id: storeId } });
-            if (!store) throw new NotFoundError("Loja não encontrada");
-
-            const whereClause = {
-                storeId,
-                isDeleted: false,
-                ...(search && {
-                    name: {
-                        contains: search,
-                        mode: "insensitive" as const
-                    }
-                })
-            };
-
-            const [categories, total] = await Promise.all([
-                tx.category.findMany({
-                    where: whereClause,
-                    select: {
-                        id: true,
-                        name: true,
-                        createdAt: true,
-                        _count: { select: { products: { where: { isDeleted: false } } } }
-                    },
-                    orderBy: { name: 'asc' },
-                    skip: (page - 1) * pageSize,
-                    take: pageSize
-                }),
-                tx.category.count({ where: whereClause })
-            ]);
-
-            return {
-                data: categories.map(cat => ({
-                    ...cat,
-                    productsCount: cat._count.products
-                })),
-                pagination: {
-                    page,
-                    pageSize,
-                    total,
-                    totalPages: Math.ceil(total / pageSize)
-                }
-            };
+        const store = await prismaClient.store.findUnique({
+            where: { id: data.storeId, isDeleted: false },
+            select: { ownerId: true }
         });
+
+        if (!store) throw new NotFoundError("StoreNotFound");
+
+        if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+            throw new ForbiddenError("UnauthorizedAccess");
+        }
+
+        const whereClause = {
+            storeId: data.storeId,
+            isDeleted: false,
+            ...(data.search && {
+                name: {
+                    contains: data.search,
+                    mode: "insensitive" as const
+                }
+            })
+        };
+
+        const [categories, total] = await Promise.all([
+            prismaClient.category.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    name: true,
+                    createdAt: true,
+                    _count: { 
+                        select: { products: { where: { isDeleted: false } } } 
+                    }
+                },
+                orderBy: { name: 'asc' },
+                skip: (data.page - 1) * data.pageSize,
+                take: data.pageSize
+            }),
+            prismaClient.category.count({ where: whereClause })
+        ]);
+
+        return {
+            data: categories.map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                createdAt: cat.createdAt,
+                productsCount: cat._count.products
+            })),
+            pagination: {
+                page: data.page,
+                pageSize: data.pageSize,
+                total,
+                totalPages: Math.ceil(total / data.pageSize)
+            }
+        };
     }
 }
 

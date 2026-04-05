@@ -1,47 +1,55 @@
+import prismaClient from "../../prisma";
 import { Prisma } from "@prisma/client";
 
 interface TrackActivityParams {
-  tx: Prisma.TransactionClient;
+  tx?: Prisma.TransactionClient;
   storeId?: number;
-  performedByUserId?: number;
+  userId?: number;
+  userType?: "OWNER" | "STORE_USER"; 
 }
 
 class ActivityTracker {
-  async track({ tx, storeId, performedByUserId }: TrackActivityParams) {
+  async track({ tx, storeId, userId, userType }: TrackActivityParams) {
+    const client = tx || prismaClient;
     const updates = [];
 
     if (storeId) {
       updates.push(
-        tx.store.update({
-          where: { id: storeId },
-          data: { lastActivityAt: new Date() }
-        })
+        client.store.update({
+          where: { 
+            id: storeId 
+          },
+          data: { 
+            lastActivityAt: new Date() 
+          }
+        }).catch(() => {})
       );
     }
 
-    if (performedByUserId && storeId) {
-      const store = await tx.store.findUnique({
-        where: { id: storeId },
-        select: { ownerId: true }
-      });
-
-      if (store?.ownerId === performedByUserId) {
+    if (userId) {
+      if (userType === "STORE_USER") {
+        updates.push(client.storeUser.update({
+          where: { 
+            id: userId 
+          },
+          data: { 
+            lastActivityAt: new Date() 
+          }
+        }).catch(() => {}));
+      } else {
         updates.push(
-          tx.user.update({
-            where: { id: performedByUserId },
-            data: { lastActivityAt: new Date() }
-          })
-        );
+          client.user.update({
+            where: { 
+              id: userId 
+            },
+            data: { 
+              lastActivityAt: new Date() 
+            }
+          }).catch((error) => {
+            console.error(`Failed to update lastActivityAt for userId ${userId}:`, error);
+          }
+        ));
       }
-    }
-
-    if (performedByUserId && !storeId) {
-      updates.push(
-        tx.user.update({
-          where: { id: performedByUserId },
-          data: { lastActivityAt: new Date() }
-        })
-      );
     }
 
     if (updates.length > 0) {

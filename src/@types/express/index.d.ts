@@ -1,6 +1,10 @@
 declare namespace Express{
     export interface Request{
-        userId: number;
-        token: string
+        user: {
+            id: number;
+            type: 'OWNER' | 'STORE_USER';
+            storeId?: number;
+            permissions?: Array<{ action: string; resource: string }>;
+        }
     }
 }

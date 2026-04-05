@@ -2,26 +2,26 @@ import { Request, Response, NextFunction } from "express";
 import { UpdateUserService } from "../../services/user/UpdateUserService";
 
 class UpdateUserController {
+    constructor(private updateUserService: UpdateUserService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { userId } = req.params;
             const { name, email, password } = req.body;
-            const performedByUserId = req.user.id;
-    
-            const updateUserService = new UpdateUserService();
-            const user = await updateUserService.execute({
-                userId: parseInt(userId, 10),
-                performedByUserId,
-                name,
-                email,
+            
+            const result = await this.updateUserService.execute({
+                userId: Number(req.params.userId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                name, 
+                email, 
                 password,
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
-            return res.status(200).json(user);
-        } catch (error) {
-            next(error);
+
+            return res.status(200).json(result);
+        } catch (error) { 
+            next(error); 
         }
     }
 }

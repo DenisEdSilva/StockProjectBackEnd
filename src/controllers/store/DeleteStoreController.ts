@@ -2,19 +2,19 @@ import { Request, Response, NextFunction } from "express";
 import { DeleteStoreService } from "../../services/store/DeleteStoreService";
 
 class DeleteStoreController {
+    constructor(private deleteStoreService: DeleteStoreService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { storeId } = req.params;
-            const performedByUserId = req.user.id;
-    
-            const deleteStoreService = new DeleteStoreService();
-            const result = await deleteStoreService.execute({
-                performedByUserId,
-                storeId: parseInt(storeId, 10),
+            const result = await this.deleteStoreService.execute({
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId,
+                storeId: Number(req.params.storeId),
                 ipAddress: req.ip,
-                userAgent: req.headers["user-agent"] as string
+                userAgent: req.headers["user-agent"] || ""
             });
-    
+
             return res.status(200).json(result);
         } catch (error) {
             next(error);

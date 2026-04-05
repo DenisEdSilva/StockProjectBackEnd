@@ -1,98 +1,69 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
+import { NotFoundError, ForbiddenError, ValidationError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface DeleteStoreRequest {
-    performedByUserId: number;
-    storeId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class DeleteStoreService {
-    async execute(data: DeleteStoreRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+
         return await prismaClient.$transaction(async (tx) => {
-
-            const isOwner = await tx.store.findUnique({
-                where: { id: data.storeId },
-                select: { ownerId: true }
-            })
-
-            if (!data.storeId || isNaN(data.storeId)) {
-                throw new ValidationError("ID da loja inválido");
-            }
-            
-            if (!data.performedByUserId || isNaN(data.performedByUserId)) {
-                throw new ValidationError("ID do proprietário inválido");
-            }
-
             const store = await tx.store.findUnique({
-                where: { id: data.storeId },
-                select: { ownerId: true }
+                where: { 
+                    id: data.storeId, 
+                    isDeleted: false 
+                }
             });
 
-            if (!store) throw new NotFoundError("Loja não encontrada");
-            if (store.ownerId !== data.performedByUserId) throw new ForbiddenError("Acesso não autorizado");
+            if (!store) {
+                throw new NotFoundError("StoreNotFound");
+            }
 
-            await this.softDeleteRelatedRecords(data.storeId, tx);
+            if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
             const deletedStore = await tx.store.update({
                 where: { id: data.storeId },
-                data: { isDeleted: true, deletedAt: new Date() }
+                data: {
+                    isDeleted: true,
+                    deletedAt: new Date(),
+                    lastActivityAt: new Date()
+                }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
-
-            const deletedData = await tx.store.findUnique({ where: { id: data.storeId } });
-
-            await auditLogService.create({
-                action: "STORE_DELETE",
-                details: {
-                    deletedData
-                },
-                ...(isOwner ? {
-                    userId: data.performedByUserId
-                } : {
-                    storeUserId: data.performedByUserId
-                }),
-                storeId: data.storeId,
-                ipAddress: data.ipAddress,
-                userAgent: data.userAgent
+                userId: data.performedByUserId
             });
 
-            return { 
-                message: "Loja marcada para exclusão",
-                deletionDate: deletedStore.deletedAt 
+            await this.auditLogService.create({
+                action: "STORE_DELETE",
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
+
+            return {
+                message: "StoreMarkedAsDeleted",
+                deletionDate: deletedStore.deletedAt
             };
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
-    }
-
-    private async softDeleteRelatedRecords(storeId: number, tx: any) {
-        const models = [
-            'stockMovimentStore',
-            'stockMoviment',
-            'product',
-            'category',
-            'storeUser',
-            'role'
-        ];
-
-        await Promise.all(models.map(model => 
-            tx[model].updateMany({
-                where: { storeId },
-                data: { isDeleted: true, deletedAt: new Date() }
-            })
-        ));
     }
 }
 

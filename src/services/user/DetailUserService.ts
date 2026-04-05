@@ -1,51 +1,50 @@
-import { NotFoundError, ValidationError } from "../../errors";
+import { NotFoundError, ForbiddenError } from "../../errors";
 import prismaClient from "../../prisma";
+import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 
-interface UserRequest {
+interface DetailUserRequest {
     userId: number;
+    userType: string;
     ipAddress: string;
     userAgent: string;
 }
 
 class DetailUserService {
-    async execute({ userId, ipAddress, userAgent }: UserRequest) {
-        if (!userId || isNaN(userId)) {
-            throw new ValidationError("Invalid user ID");
+    constructor(private auditLogService: CreateAuditLogService) {}
+
+    async execute(data: DetailUserRequest) {
+        if (!Number.isInteger(data.userId) || data.userType !== 'OWNER') {
+            throw new ForbiddenError("UnauthorizedAccess");
         }
 
-        const user = await prismaClient.user.findUnique({
-            where: {
-                id: userId,
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                ownedStores: true
-            },
-        });
+        return await prismaClient.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({
+                where: { id: data.userId, isDeleted: false },
+                select: {
+                    id: true, 
+                    name: true, 
+                    email: true,
+                    ownedStores: {
+                        where: { isDeleted: false },
+                        select: { id: true, name: true }
+                    }
+                },
+            });
 
+            if (!user) {
+                throw new NotFoundError("UserNotFound");
+            }
 
-        if (!user) {
-            throw new NotFoundError("Usuário não encontrado");
-        }
-
-        await prismaClient.auditLog.create({
-            data: {
-                action: "DETAIL_USER",
-                details: JSON.stringify({
-                    userId: user.id,
-                    name: user.name,
-                    email: user.email
-                }),
+            await this.auditLogService.create({
+                action: "USER_DETAILS_ACCESSED",
                 userId: user.id,
-                ipAddress: ipAddress,
-                userAgent: userAgent,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
                 isOwner: true
-            },
-        });
+            }, tx);
 
-        return user;
+            return user;
+        });
     }
 }
 

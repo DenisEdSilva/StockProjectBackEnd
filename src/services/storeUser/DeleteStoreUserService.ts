@@ -1,88 +1,81 @@
 import prismaClient from "../../prisma";
-import { 
-    ValidationError, 
-    NotFoundError 
-} from "../../errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface DeleteRequest {
-    performedByUserId: number;
-    storeId: number;
-    storeUserId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class DeleteStoreUserService {
-    async execute(data: DeleteRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-            this.validateInput(data);
-
-            const isOwner = await tx.store.findUnique({
-                where: { 
-                    id: data.storeId 
-                },
-                select: { 
-                    ownerId: true 
-                }
-            });
-
             const user = await tx.storeUser.findUnique({
-                where: { id: data.storeUserId, storeId: data.storeId }
+                where: { 
+                    id: data.storeUserId, 
+                    storeId: data.storeId, 
+                    isDeleted: false 
+                },
+                include: { store: { select: { ownerId: true } } }
             });
 
-            if (!user) throw new NotFoundError("Usuário não encontrado");
-            if (user.isDeleted) throw new NotFoundError("Usuário já desativado");
+            if (!user) {
+                throw new NotFoundError("StoreUserNotFound");
+            }
+
+            if (data.userType === 'OWNER' && user.store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
             const deletedUser = await tx.storeUser.update({
                 where: { id: data.storeUserId },
                 data: {
                     isDeleted: true,
-                    deletedAt: new Date(),
-                    deletedBy: data.performedByUserId
+                    deletedAt: new Date()
                 }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.performedByUserId
-            })
-
-            const deletedData = await tx.storeUser.findUnique({ where: { id: data.storeUserId } });
-
-            await auditLogService.create({
-                action: "STORE_USER_DELETE",
-                details: {
-                    deletedData
-                },
-                ...(isOwner ? {
-                    userId: data.performedByUserId,
-                } : {
-                    storeUserId: data.performedByUserId
-                }),
-                storeId: data.storeId,
-                ipAddress: data.ipAddress,
-                userAgent: data.userAgent
+                userId: data.performedByUserId
             });
 
+            await this.auditLogService.create({
+                action: "STORE_USER_DELETE",
+                details: { 
+                    deletedUserId: data.storeUserId, 
+                    email: user.email 
+                },
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER'
+            }, tx);
+
             return { 
-                message: "Usuário excluído",
+                message: "UserDeletedSuccessfully",
                 deletedAt: deletedUser.deletedAt
             };
-        }, {
-            maxWait: 15000,
-            timeout: 15000
         });
     }
-    
-    private validateInput(data: DeleteRequest) {
-        if (!data.storeUserId || isNaN(data.storeUserId)) throw new ValidationError("ID inválido");
-        if (!data.storeId || isNaN(data.storeId)) throw new ValidationError("ID da loja inválido");
-        if (!data.performedByUserId || isNaN(data.performedByUserId)) throw new ValidationError("ID do executor inválido");
+
+    private validateInput(data: any) {
+        if (!Number.isInteger(data.storeUserId)) {
+            throw new ValidationError("InvalidStoreUserId");
+        }
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
     }
 }
 

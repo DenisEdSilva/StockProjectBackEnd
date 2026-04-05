@@ -1,10 +1,12 @@
+import { Prisma } from "@prisma/client";
 import prismaClient from "../../prisma";
 import { compare } from "bcryptjs";
 import { sign } from "jsonwebtoken";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
-import { ForbiddenError, UnauthorizedError, ValidationError } from "../../errors";
-import { redisClient } from "../../redis.config";
 import { ActivityTracker } from "../activity/ActivityTracker";
+import { ForbiddenError, UnauthorizedError, ValidationError } from "../../errors";
+import { AccessControlProvider } from "../../shared/AccessControlProvider";
+import { redisClient } from "../../redis.config";
 
 interface AuthRequest {
     email: string;
@@ -17,64 +19,67 @@ interface OwnerData {
     id: number;
     name: string;
     email: string;
-    ownedStores: Array<{ id: number; name: string }>;
-    createdAt: Date;
-    updatedAt: Date;
-    lastActivityAt: Date;
+    isOwner: boolean;
+    markedForDeletionAt: Date | null;
+    ownedStores: Array<{ 
+        id: number; 
+        name: string; 
+        isDeleted: boolean 
+    }>;
 }
 
 interface StoreUserData {
     id: number;
     name: string;
     email: string;
-    storeId: number;
     roleId: number;
+    storeId: number;
     role: {
-        permissions: Array<{ permission: { action: string; resource: string } }>
-    }
-    createdAt: Date;
-    updatedAt: Date;
+        permissions: Array<{ 
+            permission: { 
+                action: string; 
+                resource: string;
+            } 
+        }>;
+    } | null;
 }
 
 class SignInService {
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker,
+        private accessControlProvider: AccessControlProvider
+    ) {}
+
     async execute(data: AuthRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+        this.validateInput(data);
+
         return await prismaClient.$transaction(async (tx) => {
-            
-            if (!this.isValidEmail(data.email)) {
-                throw new ValidationError("Formato de email inválido");
-            };
 
-            if (!this.isValidPassword(data.password)) {
-                throw new ValidationError("Senha deve ter pelo menos 8 caracteres");
-            };
-
-            const [ owner, storeUser ] = await Promise.all([
-                prismaClient.user.findFirst({
-                    where: { 
-                        email: data.email 
-                    },
+            const [owner, storeUser] = await Promise.all([
+                tx.user.findUnique({
+                    where: { email: data.email, isDeleted: false },
                     include: {
                         ownedStores: {
-                            select: {
-                                id: true,
-                                name: true
-                            }
+                            where: { isDeleted: false },
+                            select: { id: true, name: true, isDeleted: true }
                         }
                     }
                 }),
-                prismaClient.storeUser.findFirst({
+                tx.storeUser.findFirst({
                     where: { 
-                        email: data.email 
+                        email: data.email, 
+                        isDeleted: false, 
+                        store: { 
+                            isDeleted: false 
+                        } 
                     },
                     include: {
+                        store: true,
                         role: {
                             include: {
-                                permissions: {
-                                    include: {
-                                        permission: true
-                                    }
+                                permissions: { 
+                                    include: { permission: true } 
                                 }
                             }
                         }
@@ -82,177 +87,171 @@ class SignInService {
                 })
             ]);
 
-            const user = owner || storeUser
-
+            const user = owner || storeUser;
+            
             if (!user) {
-                throw new ValidationError("Usuário ou senha inválidos");
-            };
-
-            const isPasswordValid = await compare(
-                data.password, 
-                user.password
-            );
-
-            if (!isPasswordValid) {
-                throw new UnauthorizedError("Usuário ou senha inválidos");
-            };
-
-            if (user === owner && owner.markedForDeletionAt) {
-                throw new ForbiddenError("Conta marcada para exclusão. Entre em contato com o suporte");
-            };
-
-            if ( user === owner) {
-                return await this.handleOwnerSignIn(data, auditLogService, user.isOwner, user);
+                throw new UnauthorizedError("InvalidCredentials");
             }
 
+            const isPasswordValid = await compare(data.password, user.password);
             
+            if (!isPasswordValid) {
+                throw new UnauthorizedError("InvalidCredentials");
+            }
 
-            if ( user === storeUser ) {
-                return await this.handleStoreUserSignIn(tx, data, auditLogService, activityTracker, storeUser);
-            };
+            if ("isOwner" in user && user.isOwner) {
+                return await this.handleOwnerSignIn(tx, data, user as OwnerData);
+            }
 
-        }, {
-            maxWait: 15000,
-            timeout: 15000
+            return await this.handleStoreUserSignIn(tx, data, user as StoreUserData);
         });
     }
 
     private async handleOwnerSignIn(
+        tx: Prisma.TransactionClient,
         data: AuthRequest,
-        auditLogService: CreateAuditLogService,
-        isOwner: boolean,
         userData: OwnerData
     ) {
-        await prismaClient.user.update({
-            where: {
-                id: userData.id
-            },
-            data: {
-                lastActivityAt: new Date()
-            }
-        })
+        if (userData.markedForDeletionAt) {
+            throw new ForbiddenError("AccountMarkedForDeletion");
+        }
 
-        await redisClient.setEx(
-            `owner:${userData.id}`,
-            30 * 24 * 3600,
-            JSON.stringify({
-                id: userData.id,
-                name: userData.name,
-                email: userData.email,
-                stores: userData.ownedStores
-            })
-        )
+        await this.activityTracker.track({ 
+            tx, 
+            userId: userData.id, 
+            userType: 'OWNER' 
+        });
+
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            throw new Error("ServerConfigurationError");
+        }
 
         const token = sign({
             id: userData.id,
-            type: "owner",
-            isOwner: isOwner,
-            ownedStores: userData.ownedStores || []
-        },
-        process.env.JWT_SECRET,
-        {
-            expiresIn: "30d"
-        })
+            type: 'OWNER',
+            isOwner: true,
+            ownedStores: userData.ownedStores
+        }, jwtSecret, { expiresIn: "30d" });
 
-        await auditLogService.create({
+        try {
+            if (redisClient.isOpen) {
+                await redisClient.setEx(
+                    `owner:${userData.id}`,
+                    30 * 24 * 3600,
+                    JSON.stringify({
+                        id: userData.id,
+                        name: userData.name,
+                        email: userData.email,
+                        stores: userData.ownedStores
+                    })
+                );
+            }
+        } catch (error) {}
+
+        await this.auditLogService.create({
             action: "USER_LOGIN",
-            details: { 
-                userId: userData.id,
-                name: userData.name,
-                email: userData.email,
-                isOwner: isOwner
-            },
             userId: userData.id,
             ipAddress: data.ipAddress,
             userAgent: data.userAgent,
-            isOwnerOverride: isOwner
-        });
+            isOwner: true
+        }, tx);
 
-        return {
-            token,
-            id: userData.id,
-            name: userData.name,
-            email: userData.email,
-            isOwner,
-            ownedStores: userData.ownedStores
-        }
+        return { 
+            token, 
+            id: userData.id, 
+            name: userData.name, 
+            email: userData.email, 
+            type: 'OWNER',
+            ownedStores: userData.ownedStores 
+        };
     }
 
     private async handleStoreUserSignIn(
-        tx: any,
+        tx: Prisma.TransactionClient,
         data: AuthRequest,
-        auditLogService: CreateAuditLogService,
-        activityTracker: ActivityTracker,
-        userData: StoreUserData 
+        userData: StoreUserData
     ) {
         if (!userData.role) {
-            throw new ForbiddenError("Usuário não possui nenhum cargo atribuído")
-        };
+            throw new ForbiddenError("NoRoleAssigned");
+        }
 
-        const permissions = userData.role.permissions.map((p) => ({
-            action: p.permission.action,
-            resource: p.permission.resource
-        }));
+        const acl = await this.accessControlProvider.uintToACL(userData.id, tx);
+        const permissions = acl.permissions;
+
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            throw new Error("ServerConfigurationError");
+        }
 
         const token = sign({
             id: userData.id,
-            type: "store",
+            type: 'STORE_USER',
             storeId: userData.storeId
-        }, 
-        process.env.JWT_SECRET,
-        {
-            expiresIn: "30d"
+        }, jwtSecret, { expiresIn: "30d" });
+
+        try {
+            if (redisClient.isOpen) {
+                await redisClient.setEx(
+                    `store:${userData.storeId}:user:${userData.id}`,
+                    30 * 24 * 3600,
+                    JSON.stringify({
+                        id: userData.id,
+                        name: userData.name,
+                        email: userData.email,
+                        storeId: userData.storeId,
+                        permissions
+                    })
+                );
+            }
+        } catch (error) {}
+
+        await this.activityTracker.track({ 
+            tx, 
+            storeId: userData.storeId, 
+            userId: userData.id,
+            userType: 'STORE_USER'
         });
 
-        await redisClient.setEx(
-            `store:${userData.storeId}:user:${userData.id}`,
-            30 * 24 * 3600,
-            JSON.stringify({
-                id: userData.id,
-                name: userData.name,
-                email: userData.email,
-                storeId: userData.storeId,
-                permissions: permissions
-            })
-        );
-
-
-        await activityTracker.track({
-            tx,
-            storeId: userData.storeId,
-        });
-
-        await auditLogService.create({
+        await this.auditLogService.create({
             action: "STORE_USER_LOGIN",
-            details: {
-                storeId: userData.storeId,
-                email: userData.email,
-                name: userData.name
-            },
             storeUserId: userData.id,
-            ipAddress: data.ipAddress,
-            userAgent: data.userAgent
-        });
-
-        return {
-            token,
-            id: userData.id,
-            name: userData.name,
-            email: userData.email,
             storeId: userData.storeId,
-            roleId: userData.roleId,
-            permissions: permissions
+            ipAddress: data.ipAddress,
+            userAgent: data.userAgent,
+            isOwner: false
+        }, tx);
+
+        return { 
+            token, 
+            id: userData.id, 
+            name: userData.name, 
+            email: userData.email, 
+            type: 'STORE_USER',
+            storeId: userData.storeId, 
+            roleId: userData.roleId, 
+            permissions 
         };
     }
-    
-    private isValidEmail(email: string): boolean {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
 
-    private isValidPassword(password: string): boolean {
+    private validateInput(data: AuthRequest) {
+        if (!data.email || typeof data.email !== "string") {
+            throw new ValidationError("InvalidEmailFormat");
+        }
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(data.email)) {
+            throw new ValidationError("InvalidEmailFormat");
+        }
+
+        if (!data.password || typeof data.password !== "string") {
+            throw new ValidationError("InvalidPasswordFormat");
+        }
+
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-        return passwordRegex.test(password);
+        if (!passwordRegex.test(data.password)) {
+            throw new ValidationError("InvalidPasswordRequirements");
+        }
     }
 }
 

@@ -2,21 +2,25 @@ import { Request, Response, NextFunction } from "express";
 import { GetProductByIdService } from "../../services/products/GetProductByIdService";
 
 class GetProductByIdController {
+    constructor(private getProductByIdService: GetProductByIdService) {}
+
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId, productId } = req.params;
 
-            const service = new GetProductByIdService();
-            const result = await service.execute({
-                storeId: parseInt(storeId, 10),
-                id: parseInt(productId, 10)
+            const product = await this.getProductByIdService.execute({
+                storeId: Number(storeId),
+                id: Number(productId),
+                performedByUserId: req.user.id,
+                userType: req.user.type,
+                tokenStoreId: req.user.storeId
             });
 
-            return res.status(200).json(result);
+            return res.status(200).json(product);
         } catch (error) {
             next(error);
         }
     }
 }
 
-export { GetProductByIdController }
+export { GetProductByIdController };

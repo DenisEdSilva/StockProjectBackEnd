@@ -3,88 +3,72 @@ import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from ".
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
 
-interface RevertDeleteStoreRequest {
-    storeId: number;
-    userId: number;
-    ipAddress: string;
-    userAgent: string;
-}
-
 class RevertDeleteStoreService {
-    async execute(data: RevertDeleteStoreRequest) {
-        const auditLogService = new CreateAuditLogService();
-        const activityTracker = new ActivityTracker();
+    constructor(
+        private auditLogService: CreateAuditLogService,
+        private activityTracker: ActivityTracker
+    ) {}
+
+    async execute(data: any) {
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+
         return await prismaClient.$transaction(async (tx) => {
-            if (!data.storeId || isNaN(data.storeId)) {
-                throw new ValidationError("ID da loja inválido");
-            }
-            
-            if (!data.userId || isNaN(data.userId)) {
-                throw new ValidationError("ID do usuário inválido");
-            }
-
-            const isOwner = await tx.store.findUnique({
-                where: { id: data.storeId },
-                select: { ownerId: true }
-            })
-
             const store = await tx.store.findUnique({
                 where: { id: data.storeId },
-                select: { ownerId: true, isDeleted: true }
+                select: { 
+                    ownerId: true, 
+                    isDeleted: true 
+                }
             });
 
-            if (!store) throw new NotFoundError("Loja não encontrada");
-            if (!store.isDeleted) throw new ConflictError("Loja não está marcada para exclusão");
-            if (store.ownerId !== data.userId) throw new ForbiddenError("Acesso não autorizado");
+            if (!store) {
+                throw new NotFoundError("StoreNotFound");
+            }
 
-            await this.restoreRelatedRecords(data.storeId, tx);
+            if (!store.isDeleted) {
+                throw new ConflictError("StoreNotDeleted");
+            }
+
+            if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
+
+            if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+                throw new ForbiddenError("UnauthorizedAccess");
+            }
 
             const restoredStore = await tx.store.update({
                 where: { id: data.storeId },
-                data: { isDeleted: false, deletedAt: null }
+                data: {
+                    isDeleted: false,
+                    deletedAt: null,
+                    lastActivityAt: new Date()
+                }
             });
 
-            await activityTracker.track({
+            await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                performedByUserId: data.userId
-            })
-
-            await auditLogService.create({
-                    action: "STORE_RESTORE",
-                    details: {
-                        storeId: restoredStore
-                    },
-                    ...(isOwner ? {
-                        userId: data.userId
-                    } : {
-                        storeUserId: data.userId
-                    }),
-                    storeId: data.storeId,
-                    ipAddress: data.ipAddress,
-                    userAgent: data.userAgent
+                userId: data.performedByUserId
             });
+
+            await this.auditLogService.create({
+                action: "STORE_RESTORE",
+                userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+                storeId: data.storeId,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                isOwner: data.userType === 'OWNER',
+                details: {
+                    storeId: data.storeId
+                }
+            }, tx);
 
             return restoredStore;
         });
-    }
-
-    private async restoreRelatedRecords(storeId: number, tx: any) {
-        const models = [
-            'stockMovimentStore',
-            'stockMoviment',
-            'product',
-            'category',
-            'storeUser',
-            'role'
-        ];
-
-        await Promise.all(models.map(model => 
-            tx[model].updateMany({
-                where: { storeId },
-                data: { isDeleted: false, deletedAt: null }
-            })
-        ));
     }
 }
 
