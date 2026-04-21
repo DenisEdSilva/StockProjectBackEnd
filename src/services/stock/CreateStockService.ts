@@ -7,6 +7,8 @@ import { ActivityTracker } from "../activity/ActivityTracker";
 interface StockRequest {
     type: string;
     productId: number;
+    productSKU: string;
+    productName: string;
     stock: number;
     storeId: number;
     destinationStoreId?: number;
@@ -233,6 +235,8 @@ class CreateStockService {
                 type: data.type,
                 stock: data.stock,
                 productId: data.productId,
+                productSKU: data.productSKU,
+                productName: data.productName,
                 storeId: data.storeId,
                 destinationStoreId: data.destinationStoreId
             },

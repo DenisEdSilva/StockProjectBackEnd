@@ -13,7 +13,7 @@ class CreateStockController {
 
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { type, stock, productId, destinationStoreId } = req.body;
+            const { type, stock, productId, destinationStoreId, productSKU, productName } = req.body;
             const { storeId } = req.params;
             const { id: performedByUserId, type: userType } = (req as AuthRequest).user;
 
@@ -22,6 +22,8 @@ class CreateStockController {
                 userType,
                 storeId: Number(storeId),
                 productId: Number(productId),
+                productSKU: productSKU,
+                productName: productName,
                 type,
                 destinationStoreId: destinationStoreId ? Number(destinationStoreId) : undefined,
                 stock: Number(stock),
