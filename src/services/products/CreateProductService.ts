@@ -9,6 +9,7 @@ interface ProductRequest {
     name: string;
     price: Prisma.Decimal;
     description: string;
+    sku?: string;
     categoryId: number;
     storeId: number;
     performedByUserId: number;
@@ -29,35 +30,52 @@ class CreateProductService {
 
         return await prismaClient.$transaction(async (tx) => {
             const store = await tx.store.findUnique({
-                where: { id: data.storeId, isDeleted: false },
-                select: { id: true, name: true, ownerId: true }
+                where: { 
+                    id: data.storeId, 
+                    isDeleted: false 
+                },
+                select: { 
+                    id: true, 
+                    name: true, 
+                    ownerId: true 
+                }
             });
 
-            if (!store) throw new NotFoundError("StoreNotFound");
+            if (!store) {
+                throw new NotFoundError("StoreNotFound");
+            };
 
             if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
                 throw new ForbiddenError("UnauthorizedAccess");
-            }
+            };
 
             if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
                 throw new ForbiddenError("UnauthorizedAccess");
-            }
+            };
 
             const category = await tx.category.findFirst({
-                where: { id: data.categoryId, storeId: data.storeId, isDeleted: false },
-                select: { id: true, name: true }
+                where: { 
+                    id: data.categoryId, 
+                    storeId: data.storeId, 
+                    isDeleted: false
+                },
+                select: { 
+                    id: true, 
+                    name: true 
+                }
             });
 
-            if (!category) throw new NotFoundError("CategoryNotFoundInThisStore");
+            if (!category) {
+                throw new NotFoundError("CategoryNotFoundInThisStore");
+            };
 
-            const categoryAbbr = this.generateAbbr(category.name, 4);
-            const storeAbbr = this.generateAbbr(store.name, 4);
-            const productCode = await this.getUniqueProductCode(tx, data.name, data.categoryId);
-            
-            const sku = `${categoryAbbr}-${productCode}-${storeAbbr}`;
+            const finalSku = data.sku ? this.normalizeSku(data.sku) : await this.generateGenericSmartSku(category.name, data.name)
 
-            const skuExists = await tx.product.findFirst({ where: { sku, storeId: data.storeId } });
-            if (skuExists) throw new ConflictError("ProductWithThisSKUAlreadyExists");
+            const existingInStore = await tx.product.findFirst({
+                where: {
+                    sku: finalSku, storeId: data.storeId
+                }
+            });
 
             const product = await tx.product.create({
                 data: {
@@ -65,11 +83,18 @@ class CreateProductService {
                     name: data.name,
                     price: data.price,
                     description: data.description,
-                    sku: sku,
+                    sku: finalSku,
                     categoryId: data.categoryId,
                     storeId: data.storeId
                 },
-                select: { id: true, name: true, price: true, stock: true, sku: true }
+                select: { 
+                    id: true, 
+                    sku: true, 
+                    name: true,
+                    description: true, 
+                    price: true, 
+                    stock: true, 
+                }
             });
 
             await this.activityTracker.track({
@@ -93,33 +118,33 @@ class CreateProductService {
         });
     }
 
-    private generateAbbr(text: string, len: number): string {
-        return text.replace(/[^a-zA-Z]/g, '').substring(0, len).toUpperCase().padEnd(len, 'X');
+    private normalizeSku(sku: string): string {
+        return sku.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
     }
 
-    private async getUniqueProductCode(tx: any, name: string, categoryId: number): Promise<string> {
-        const cleaned = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        const baseCode = cleaned.substring(0, 5);
+    private async generateGenericSmartSku(categoryName: string, productName: string): Promise<string> {
+        const catPart = categoryName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase().padEnd(3, 'X');
+        const namePart = productName.replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase().padEnd(4, 'X');
 
-        const existing = await tx.product.findFirst({
-            where: { name: name.trim(), categoryId: categoryId },
-            select: { sku: true }
-        });
+        const hashPart = Math.random().toString(36).substring(2, 6).toUpperCase();
 
-        if (existing) {
-            return existing.sku.split('-')[1];
-        }
-
-        const randomSuffix = Math.random().toString(36).substring(2, 4).toUpperCase();
-        return `${baseCode}${randomSuffix}`;
+        return `${catPart}-${namePart}-${hashPart}`;
     }
 
     private validateInput(data: ProductRequest) {
-        if (!data.name?.trim()) {
+        if (!data.name?.trim() || data.name.length < 3) {
             throw new ValidationError("InvalidProductName");
         }
-        if (!data.price || data.price.isNaN() || data.price.lessThanOrEqualTo(0)) {
+        const priceValue = Number(data.price);
+        if (isNaN(priceValue) || priceValue <= 0) {
             throw new ValidationError("InvalidPrice");
+        }
+        
+        if (!data.categoryId) {
+            throw new ValidationError("CategoryRequired");
+        }
+        if (!data.storeId) {
+            throw new ValidationError("StoreRequired");
         }
     }
 }
