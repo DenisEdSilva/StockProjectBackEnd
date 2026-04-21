@@ -35,6 +35,7 @@ class AuditLogService {
             }
 
             this.validateDates(filters.startDate, filters.endDate);
+
             const page = filters.page || 1;
             const limit = filters.limit || 25;
             this.validatePagination(page, limit);
@@ -87,13 +88,17 @@ class AuditLogService {
                 throw new NotFoundError("Nenhum registro encontrado");
             }
 
-            const formattedLogs = logs.map(log => ({
-                ...log,
-                action: this.translateAction(log.action),
-                userName: this.getUserName(log) || `Usuário da Loja ${log.storeUserId}`,
-                formattedDetails: this.formatDetails(log.action, log.details),
-                createdAt: log.createdAt.toISOString()
-            }));
+            const formattedLogs = logs.map(log => {
+                const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+
+                return {
+                    ...log,
+                    actionLabel: this.translateAction(log.action),
+                    description: this.buildNarrative(log.action, details),
+                    userName: this.getUserName(log),
+                    createdAt: log.createdAt.toISOString()
+                };
+            });
 
             const users = this.getDistinctUsers(logs)
 
@@ -111,6 +116,44 @@ class AuditLogService {
                 }
             };
         });
+    }
+
+    private buildNarrative(action: string, details: any): string {
+        if (!details) return "Realizou uma operação no sistema";
+
+        switch (action) {
+            case 'STOCK_MOVIMENT_CREATE':
+                const type = details.type === 'IN' ? 'Entrada' : 'Saída';
+                return `${type} de ${details.stock} unidades. | SKU: ${details.sku} | ${details.productName} (#${details.productId})`;
+            
+            case 'PRODUCT_CREATE':
+                return `Cadastrou o produto: "${details.name}"`;
+                
+            case 'CATEGORY_CREATE':
+                return `Criou a categoria: "${details.name}"`;
+
+            case 'ROLE_CREATE':
+                return `Definiu o novo cargo: "${details.name}"`;
+
+            case 'STORE_CREATE':
+                return `Inaugurou a unidade: "${details.name}" em ${details.city}`;
+
+            case 'PRODUCT_UPDATE':
+                return `Editou informações do produto: "${details.name}"`;
+
+            default:
+                if (action.includes('UPDATE')) {
+                    return `Atualizou dados de "${details.name || 'Registro #' + (details.id || '')}"`;
+                }
+                if (action.includes('_LIST') || action.includes('_GET')) {
+                    const resource = action.split('_')[0].toLowerCase();
+                    return `Consultou a listagem de ${resource}`;
+                }
+                if (action.includes('_LOGIN')) {
+                    return `Realizou login na plataforma`
+                }
+                return "Realizou uma alteração nas configurações";
+        }
     }
 
     private getUserName = (log: any): string => {
@@ -157,6 +200,9 @@ class AuditLogService {
 
     private translateAction(action: string): string {
         const actionTranslations: Record<string, string> = {
+            'STORE_CREATE': 'Criação da Loja',
+            'STORE_USER_LOGIN': 'Login de Usuário',
+            'STORE_USER_CREATE': 'Criação de Usuário',
             'ROLE_CREATE': 'Criação de Cargo',
             'ROLE_UPDATE': 'Atualização de Cargo',
             'CREATE_STORE_USER': 'Criação de Usuário da Loja',
@@ -165,34 +211,13 @@ class AuditLogService {
             'CATEGORY_UPDATE': 'Atualização de Categoria',
             'PRODUCT_CREATE': 'Criação de Produto',
             'PRODUCT_UPDATE': 'Atualização de Produto',
+            'STOCK_MOVIMENT_LIST': 'Listagem de Movimentações',
             'STOCK_MOVIMENT_CREATE': 'Movimentação de Estoque',
             'STOCK_TRANSFER': 'Transferência de Estoque',
             'STOCK_REVERT': 'Reversão de Estoque',
         };
     
         return actionTranslations[action] || action;
-    }
-
-    private formatDetails(action: string, details: Prisma.JsonValue | null): string {
-        if (!details) return '';
-        
-        const parsed = typeof details === 'string' ? JSON.parse(details) : details;
-
-        switch(action) {
-            case 'ROLE_UPDATE':
-                return `Cargo: ${parsed['name']}\nPermissões: ${parsed['permissionIds']?.join(', ')}`;
-            case 'USER_CREATE':
-                return `Email: ${parsed['email']}\nTipo: ${parsed['type']}`;
-            case 'PRODUCT_UPDATE':
-                return `Produto: ${parsed['name']}\nPreço: R$ ${parsed['price']}\nEstoque: ${parsed['stock']}`;
-            default:
-                if (typeof parsed === 'object') {
-                    return Object.entries(parsed as Record<string, any>)
-                        .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-                        .join('\n');
-                }
-                return String(parsed);
-        }
     }
 
     private validateDates(start?: Date, end?: Date) {
