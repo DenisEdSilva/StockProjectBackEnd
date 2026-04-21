@@ -1,7 +1,7 @@
 import { Response } from "express";
 
 export function setAuthCookie(res: Response, token: string, maxAgeMs?: number) {
-    res.cookie("access_token", token, {
+    res.cookie("stockproject.token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

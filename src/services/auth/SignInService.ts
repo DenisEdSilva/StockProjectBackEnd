@@ -159,11 +159,13 @@ class SignInService {
 
         return { 
             token, 
-            id: userData.id, 
-            name: userData.name, 
-            email: userData.email, 
-            type: 'OWNER',
-            ownedStores: userData.ownedStores 
+            user: {
+                id: userData.id, 
+                name: userData.name, 
+                email: userData.email, 
+                type: 'OWNER',
+                ownedStores: userData.ownedStores 
+            }
         };
     }
 
@@ -224,13 +226,15 @@ class SignInService {
 
         return { 
             token, 
-            id: userData.id, 
-            name: userData.name, 
-            email: userData.email, 
-            type: 'STORE_USER',
-            storeId: userData.storeId, 
-            roleId: userData.roleId, 
-            permissions 
+            user: {
+                id: userData.id, 
+                name: userData.name, 
+                email: userData.email, 
+                type: 'STORE_USER',
+                storeId: userData.storeId, 
+                roleId: userData.roleId, 
+                permissions 
+            }
         };
     }
 

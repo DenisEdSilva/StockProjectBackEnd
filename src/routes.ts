@@ -348,7 +348,7 @@ router.delete("/stores/:storeId",
 
 
 // ROLE ROUTES
-router.post("/stores/:storeId/roles/",
+router.post("/stores/:storeId/roles",
 	authenticated,
 	authorized("POST", "ROLE"),
 	(req: Request, res: Response, next: NextFunction) => {
@@ -356,7 +356,7 @@ router.post("/stores/:storeId/roles/",
 	}
 );
 
-router.get("/stores/:storeId/roles/",
+router.get("/stores/:storeId/roles",
 	authenticated,
 	authorized("GET", "ROLE"),
 	(req: Request, res: Response, next: NextFunction) => {

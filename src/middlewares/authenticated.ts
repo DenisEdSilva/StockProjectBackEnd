@@ -25,7 +25,10 @@ export async function authenticated(
     next: NextFunction
 ): Promise<void> {
     try {
-        const token = req.cookies?.access_token;
+        const authHeader = req.headers.authorization;
+        const cookieToken = req.cookies?.['stockproject.token'] || req.cookies?.access_token;
+        
+        const token = authHeader ? authHeader.split(' ')[1] : cookieToken;
         
         if (!token) {
             throw new ValidationError("TokenNotFound");

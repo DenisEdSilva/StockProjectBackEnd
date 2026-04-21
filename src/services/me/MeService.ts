@@ -21,6 +21,8 @@ class MeService {
 
     const acl = await this.accessControlProvider.uintToACL(user.id, prismaClient);
 
+    console.log("Usuario encontrado: ", acl, "ID do usuário:", user.id);
+
     return {
       type: 'STORE_USER',
       id: acl.id,
@@ -33,7 +35,10 @@ class MeService {
 
   private async getOwnerData(userId: number): Promise<MeResponse> {
     const owner = await prismaClient.user.findUnique({
-      where: { id: userId, isDeleted: false },
+      where: { 
+        id: userId, 
+        isDeleted: false 
+      },
       select: {
         id: true,
         name: true,
