@@ -21,18 +21,32 @@ class ListStoreService {
                     zipCode: true,
                     _count: {
                         select: {
-                            products: { where: { isDeleted: false } },
-                            categories: { where: { isDeleted: false } },
-                            storeUsers: { where: { isDeleted: false } }
+                            products: { 
+                                where: { 
+                                    isDeleted: false 
+                                } 
+                            },
+                            categories: { 
+                                where: { 
+                                    isDeleted: false 
+                                } 
+                            },
+                            storeUsers: { 
+                                where: { 
+                                    isDeleted: false 
+                                } 
+                            }
                         }
                     }
                 }
             });
 
-            return store ? [store] : [];
+            return {
+                stores: store ? [store] : []
+            }
         }
 
-        return await prismaClient.store.findMany({
+        const stores = await prismaClient.store.findMany({
             where: { 
                 ownerId: data.userId, 
                 isDeleted: false 
@@ -45,9 +59,21 @@ class ListStoreService {
                 zipCode: true,
                 _count: {
                     select: {
-                        products: { where: { isDeleted: false } },
-                        categories: { where: { isDeleted: false } },
-                        storeUsers: { where: { isDeleted: false } }
+                        products: { 
+                            where: { 
+                                isDeleted: false 
+                            } 
+                        },
+                        categories: {
+                             where: { 
+                                isDeleted: false 
+                            } 
+                        },
+                        storeUsers: { 
+                            where: { 
+                                isDeleted: false 
+                            } 
+                        }
                     }
                 }
             },
@@ -55,6 +81,10 @@ class ListStoreService {
                 name: 'asc'
             }
         });
+
+        return {
+            stores
+        };
     }
 }
 

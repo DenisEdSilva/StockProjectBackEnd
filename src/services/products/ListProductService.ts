@@ -56,7 +56,13 @@ class ListProductService {
                     stock: true,
                     banner: true,
                     sku: true,
-                    category: { select: { name: true } },
+                    description: true,
+                    category: { 
+                        select: { 
+                            id: true,
+                            name: true 
+                        } 
+                    },
                     createdAt: true
                 },
                 orderBy: { name: 'asc' },

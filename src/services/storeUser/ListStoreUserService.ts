@@ -54,8 +54,12 @@ class ListStoreUserService {
                     email: true,
                     storeId: true,
                     role: {
-                        select: { name: true }
-                    }
+                        select: { 
+                            id: true,
+                            name: true 
+                        }
+                    },
+                    createdAt: true
                 },
                 orderBy: { name: "asc" },
                 skip: (data.page - 1) * data.pageSize,
@@ -69,8 +73,12 @@ class ListStoreUserService {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                role: user.role.name,
-                storeId: user.storeId
+                role: {
+                    id: user.role.id,
+                    name: user.role.name
+                },
+                storeId: user.storeId,
+                createdAt: user.createdAt
             })),
             pagination: {
                 page: data.page,

@@ -47,6 +47,7 @@ class ListCategoryService {
                 select: {
                     id: true,
                     name: true,
+                    storeId: true,
                     createdAt: true,
                     _count: { 
                         select: { products: { where: { isDeleted: false } } } 
@@ -63,6 +64,7 @@ class ListCategoryService {
             data: categories.map(cat => ({
                 id: cat.id,
                 name: cat.name,
+                storeId: cat.storeId,
                 createdAt: cat.createdAt,
                 productsCount: cat._count.products
             })),
