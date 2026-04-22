@@ -93,10 +93,6 @@ class AuditLogService {
                 tx.auditLog.count({ where })
             ]);
 
-            if (logs.length === 0) {
-                throw new NotFoundError("Nenhum registro encontrado");
-            }
-
             const formattedLogs = logs.map(log => {
                 const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
                 
@@ -172,7 +168,9 @@ class AuditLogService {
 
             case 'STOCK_MOVIMENT_CREATE':
                 const type = details.type === 'IN' ? 'Entrada' : 'Saída';
-                return `${type} de ${details.stock} unidades. | SKU: ${details.sku} | ${details.productName} (#${details.productId})`;
+                const sku = details.productSKU || details.sku || 'N/A';
+                const name = details.productName || 'Produto Desconhecido';
+                return `${type} de ${details.stock} unidades. | SKU: ${sku} | ${name} (#${details.productId})`;
 
             default:
                 if (action.includes('UPDATE')) {

@@ -7,8 +7,8 @@ import { ActivityTracker } from "../activity/ActivityTracker";
 interface StockRequest {
     type: string;
     productId: number;
-    productSKU: string;
-    productName: string;
+    productSKU?: string;
+    productName?: string;
     stock: number;
     storeId: number;
     destinationStoreId?: number;
@@ -147,7 +147,7 @@ class CreateStockService {
             }
         });
 
-        await this.createAuditLog(tx, data, movement.id, ownerId);
+        await this.createAuditLog(tx, data, movement.id, ownerId, originInventory);
 
         return movement;
     }
@@ -188,7 +188,7 @@ class CreateStockService {
             }
         });
 
-        await this.createAuditLog(tx, data, stockMovement.id, ownerId);
+        await this.createAuditLog(tx, data, stockMovement.id, ownerId, originInventory);
 
         return stockMovement;
     }
@@ -197,7 +197,8 @@ class CreateStockService {
         tx: Prisma.TransactionClient,
         data: StockRequest,
         movimentId: number,
-        ownerId: number
+        ownerId: number,
+        originInventory: OriginInventory
     ) {
         const isOwnerUser = data.userType === 'OWNER';
 
@@ -217,10 +218,10 @@ class CreateStockService {
                 type: data.type,
                 stock: data.stock,
                 productId: data.productId,
-                productSKU: data.productSKU,
-                productName: data.productName,
                 storeId: data.storeId,
-                destinationStoreId: data.destinationStoreId
+                destinationStoreId: data.destinationStoreId,
+                productSKU: originInventory.product.sku,
+                productName: originInventory.product.name
             },
             userId: isOwnerUser ? data.performedByUserId : undefined,
             storeUserId: !isOwnerUser ? data.performedByUserId : undefined,
