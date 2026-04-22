@@ -15,21 +15,45 @@ class GetProductByIdService {
             throw new ValidationError("InvalidIdsProvided");
         }
 
-        const product = await prismaClient.product.findUnique({ 
+        const inventoryItem = await prismaClient.storeInventory.findFirst({ 
             where: {
-                id: data.id,
+                productId: data.id,
                 storeId: data.storeId,
-                isDeleted: false
+                isDeleted: false,
+                product: {
+                    isDeleted: false
+                }
             },
             include: {
-                category: { select: { name: true } },
-                store: { select: { ownerId: true } }
+                product: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        name: true,
+                        description: true,
+                        banner: true,
+                        categoryId: true,
+                        category: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
+                    }
+                },
+                store: {
+                    select: {
+                        ownerId: true
+                    }
+                }
             }
         });
 
-        if (!product) throw new NotFoundError("ProductNotFound");
+        if (!inventoryItem) {
+            throw new NotFoundError("ProductNotFoundInStore");
+        }
 
-        if (data.userType === 'OWNER' && product.store.ownerId !== data.performedByUserId) {
+        if (data.userType === 'OWNER' && inventoryItem.store.ownerId !== data.performedByUserId) {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
@@ -37,8 +61,18 @@ class GetProductByIdService {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
-        const { store, ...productData } = product;
-        return productData;
+        return {
+            id: inventoryItem.product.id,
+            storeInventoryId: inventoryItem.id,
+            name: inventoryItem.product.name,
+            price: inventoryItem.price,
+            stock: inventoryItem.stock,
+            banner: inventoryItem.product.banner,
+            sku: inventoryItem.product.sku,
+            description: inventoryItem.product.description,
+            categoryId: inventoryItem.product.categoryId,
+            category: inventoryItem.product.category,
+        };
     }
 }
 

@@ -66,9 +66,9 @@ export async function authenticated(
             req.user = {
                 id: decoded.id,
                 type: decoded.type,
+                permissions: userData.permissions || [], 
                 ...(decoded.type === 'STORE_USER' && {
                     storeId: decoded.storeId,
-                    permissions: userData.permissions || [],
                 }),
             };
             return next();
@@ -84,7 +84,11 @@ export async function authenticated(
                 throw new UnauthorizedError("SessionInvalid");
             }
 
-            req.user = { id: decoded.id, type: 'OWNER' };
+            req.user = { 
+                id: decoded.id, 
+                type: 'OWNER',
+                permissions: []
+            };
         } else {
             const accessControl = new AccessControlProvider();
             const userData = await accessControl.uintToACL(decoded.id, prismaClient);
@@ -106,7 +110,7 @@ export async function authenticated(
                             name: userData.name,
                             email: userData.email,
                             storeId: decoded.storeId,
-                            permissions: userData.permissions
+                            permissions: userData.permissions || []
                         })
                     );
                 }

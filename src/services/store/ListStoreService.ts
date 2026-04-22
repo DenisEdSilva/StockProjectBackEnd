@@ -21,7 +21,7 @@ class ListStoreService {
                     zipCode: true,
                     _count: {
                         select: {
-                            products: { 
+                            inventory: { 
                                 where: { 
                                     isDeleted: false 
                                 } 
@@ -59,7 +59,7 @@ class ListStoreService {
                 zipCode: true,
                 _count: {
                     select: {
-                        products: { 
+                        inventory: { 
                             where: { 
                                 isDeleted: false 
                             } 

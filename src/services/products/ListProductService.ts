@@ -1,5 +1,6 @@
 import prismaClient from "../../prisma";
 import { ValidationError, ForbiddenError, NotFoundError } from "../../errors";
+import { Prisma } from "@prisma/client";
 
 interface ListProductRequest {
     storeId: number;
@@ -34,46 +35,71 @@ class ListProductService {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
-        const whereClause = {
+        const whereClause: Prisma.StoreInventoryWhereInput = {
             storeId: data.storeId,
             isDeleted: false,
-            ...(data.search && {
-                name: { contains: data.search, mode: "insensitive" as const }
-            }),
-            ...(data.sku && {
-                sku: { contains: data.sku, mode: "insensitive" as const }
-            }),
-            ...(data.categoryId && { categoryId: Number(data.categoryId) })
+            product: {
+                isDeleted: false,
+                ...(data.search && {
+                    name: { contains: data.search, mode: "insensitive" }
+                }),
+                ...(data.sku && {
+                    sku: { contains: data.sku, mode: "insensitive" }
+                }),
+                ...(data.categoryId && { categoryId: Number(data.categoryId) })
+            }
         };
 
-        const [products, total] = await Promise.all([
-            prismaClient.product.findMany({
+        const [inventoryItems, total] = await Promise.all([
+            prismaClient.storeInventory.findMany({
                 where: whereClause,
                 select: {
                     id: true,
-                    name: true,
                     price: true,
                     stock: true,
-                    banner: true,
-                    sku: true,
-                    description: true,
-                    category: { 
-                        select: { 
+                    createdAt: true,
+                    product: {
+                        select: {
                             id: true,
-                            name: true 
-                        } 
-                    },
-                    createdAt: true
+                            sku: true,
+                            name: true,
+                            description: true,
+                            banner: true,
+                            category: {
+                                select: {
+                                    id: true,
+                                    name: true
+                                }
+                            }
+                        }
+                    }
                 },
-                orderBy: { name: 'asc' },
+                orderBy: { 
+                    product: { 
+                        name: 'asc' 
+                    }
+                },
                 skip: (data.page - 1) * data.pageSize,
                 take: data.pageSize
             }),
-            prismaClient.product.count({ where: whereClause })
+            prismaClient.storeInventory.count({ where: whereClause })
         ]);
 
+        const formattedProducts = inventoryItems.map(item => ({
+            id: item.product.id,
+            storeInventoryId: item.id,
+            name: item.product.name,
+            price: item.price,
+            stock: item.stock,
+            banner: item.product.banner,
+            sku: item.product.sku,
+            description: item.product.description,
+            category: item.product.category,
+            createdAt: item.createdAt
+        }));
+
         return {
-            data: products,
+            data: formattedProducts,
             pagination: {
                 page: data.page,
                 pageSize: data.pageSize,

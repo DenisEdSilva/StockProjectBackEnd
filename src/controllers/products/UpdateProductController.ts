@@ -9,9 +9,9 @@ class UpdateProductController {
             const { storeId, productId } = req.params;
             const { sku, name, price, description, banner, categoryId } = req.body;
 
-            const userPermissions = req.user.permissions.map(p => 
+            const userPermissions = req.user?.permissions?.map((p: any) => 
                 `${p.action.toUpperCase()}_${p.resource.toUpperCase()}`
-            );
+            ) ?? [];
 
             const product = await this.updateProductService.execute({
                 productId: Number(productId),

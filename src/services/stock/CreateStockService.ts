@@ -18,15 +18,16 @@ interface StockRequest {
     userAgent?: string;
 }
 
-interface OriginProduct {
+interface OriginInventory {
     id: number;
-    sku: string;
-    name: string;
-    description: string;
-    price: Prisma.Decimal;
-    banner: string;
     stock: number;
-    category: { name: string };
+    price: Prisma.Decimal;
+    product: {
+        id: number;
+        sku: string;
+        name: string;
+        isDeleted: boolean;
+    };
 }
 
 class CreateStockService {
@@ -54,137 +55,114 @@ class CreateStockService {
                 throw new NotFoundError("StoreNotFound");
             }
 
-            if (data.userType === 'OWNER') {
-                if (data.performedByUserId !== store.ownerId) {
-                    throw new ForbiddenError("UnauthorizedStoreAccess");
-                }
+            if (data.userType === 'OWNER' && data.performedByUserId !== store.ownerId) {
+                throw new ForbiddenError("UnauthorizedStoreAccess");
             }
 
-            const originProduct = await tx.product.findUnique({
+            const originInventory = await tx.storeInventory.findUnique({
                 where: {
-                    id: data.productId,
-                    storeId: data.storeId,
-                    isDeleted: false
+                    storeId_productId: {
+                        storeId: data.storeId,
+                        productId: data.productId
+                    }
                 },
-                select: {
-                    id: true,
-                    sku: true,
-                    name: true,
-                    description: true,
-                    price: true,
-                    banner: true,
-                    stock: true,
-                    category: { select: { name: true } }
+                include: {
+                    product: {
+                        select: { id: true, sku: true, name: true, isDeleted: true }
+                    }
                 }
             });
 
-            if (!originProduct) {
-                throw new NotFoundError("ProductNotFound");
+            if (!originInventory || originInventory.isDeleted || originInventory.product.isDeleted) {
+                throw new NotFoundError("ProductNotFoundInStoreInventory");
             }
 
             if (data.type === 'TRANSFER') {
-                return await this.handleTransfer(tx, data, originProduct, store.ownerId);
+                return await this.handleTransfer(tx, data, originInventory as OriginInventory, store.ownerId);
             }
 
-            return await this.handleStandardMovement(tx, data, originProduct);
+            return await this.handleStandardMovement(tx, data, originInventory as OriginInventory, store.ownerId);
         });
     }
 
     private async handleTransfer(
-    tx: Prisma.TransactionClient,
-    data: StockRequest,
-    originProduct: OriginProduct,
-    ownerId: number
-) {
-    const destinationStore = await tx.store.findUnique({
-        where: { id: data.destinationStoreId, isDeleted: false },
-        select: { id: true, ownerId: true }
-    });
-
-    if (!destinationStore) throw new NotFoundError("DestinationStoreNotFound");
-    if (destinationStore.ownerId !== ownerId) throw new ForbiddenError("UnauthorizedCrossOwnerTransfer");
-
-    const destinationProduct = await tx.product.upsert({
-        where: {
-            sku_storeId: {
-                sku: originProduct.sku,
-                storeId: data.destinationStoreId!
+        tx: Prisma.TransactionClient,
+        data: StockRequest,
+        originInventory: OriginInventory,
+        ownerId: number
+    ) {
+        const destinationStore = await tx.store.findUnique({
+            where: { 
+                id: data.destinationStoreId, 
+                isDeleted: false 
+            },
+            select: { 
+                id: true, 
+                ownerId: true 
             }
-        },
-        update: {},
-        create: {
-            sku: originProduct.sku,
-            name: originProduct.name,
-            banner: originProduct.banner,
-            description: originProduct.description,
-            price: originProduct.price,
-            stock: 0,
-            store: {
-                connect: {
-                    id: data.destinationStoreId!
+        });
+
+        if (!destinationStore) throw new NotFoundError("DestinationStoreNotFound");
+        if (destinationStore.ownerId !== ownerId) throw new ForbiddenError("UnauthorizedCrossOwnerTransfer");
+
+        const updateOrigin = await tx.storeInventory.updateMany({
+            where: {
+                id: originInventory.id,
+                stock: { gte: data.stock },
+                isDeleted: false
+            },
+            data: { stock: { decrement: data.stock } }
+        });
+
+        if (updateOrigin.count === 0) throw new ConflictError("InsufficientStock");
+
+        await tx.storeInventory.upsert({
+            where: {
+                storeId_productId: {
+                    storeId: data.destinationStoreId!,
+                    productId: data.productId
                 }
             },
-            category: {
-                connectOrCreate: {
-                    where: { 
-                        name_storeId: { 
-                            name: originProduct.category.name, 
-                            storeId: data.destinationStoreId! 
-                        } 
-                    },
-                    create: { 
-                        name: originProduct.category.name, 
-                        storeId: data.destinationStoreId! 
-                    }
-                }
+            update: {
+                stock: { increment: data.stock },
+                isDeleted: false
+            },
+            create: {
+                productId: data.productId,
+                storeId: data.destinationStoreId!,
+                price: originInventory.price,
+                stock: data.stock
             }
-        }
-    });
+        });
 
-    const updateOrigin = await tx.product.updateMany({
-        where: {
-            id: data.productId,
-            stock: { gte: data.stock },
-            isDeleted: false
-        },
-        data: { stock: { decrement: data.stock } }
-    });
+        const movement = await tx.stockMoviment.create({
+            data: {
+                productId: data.productId,
+                previousStock: originInventory.stock,
+                stock: data.stock,
+                type: StockMovimentType.TRANSFER,
+                storeId: data.storeId,
+                destinationStoreId: data.destinationStoreId,
+                createdBy: data.performedByUserId
+            }
+        });
 
-    if (updateOrigin.count === 0) throw new ConflictError("InsufficientStock");
+        await this.createAuditLog(tx, data, movement.id, ownerId);
 
-    await tx.product.update({
-        where: { id: destinationProduct.id },
-        data: { stock: { increment: data.stock } }
-    });
-
-    const movement = await tx.stockMoviment.create({
-        data: {
-            productId: data.productId,
-            previousStock: originProduct.stock,
-            stock: data.stock,
-            type: StockMovimentType.TRANSFER,
-            storeId: data.storeId,
-            destinationStoreId: data.destinationStoreId,
-            createdBy: data.performedByUserId
-        }
-    });
-
-    await this.createAuditLog(tx, data, movement.id);
-
-    return movement;
-}
+        return movement;
+    }
 
     private async handleStandardMovement(
         tx: Prisma.TransactionClient,
         data: StockRequest,
-        originProduct: OriginProduct
+        originInventory: OriginInventory,
+        ownerId: number
     ) {
         const isOut = data.type === 'OUT';
 
-        const updated = await tx.product.updateMany({
+        const updated = await tx.storeInventory.updateMany({
             where: {
-                id: data.productId,
-                storeId: data.storeId,
+                id: originInventory.id,
                 isDeleted: false,
                 ...(isOut && { stock: { gte: data.stock } })
             },
@@ -202,7 +180,7 @@ class CreateStockService {
         const stockMovement = await tx.stockMoviment.create({
             data: {
                 productId: data.productId,
-                previousStock: originProduct.stock,
+                previousStock: originInventory.stock,
                 stock: data.stock,
                 type: data.type as StockMovimentType,
                 storeId: data.storeId,
@@ -210,7 +188,7 @@ class CreateStockService {
             }
         });
 
-        await this.createAuditLog(tx, data, stockMovement.id);
+        await this.createAuditLog(tx, data, stockMovement.id, ownerId);
 
         return stockMovement;
     }
@@ -218,7 +196,8 @@ class CreateStockService {
     private async createAuditLog(
         tx: Prisma.TransactionClient,
         data: StockRequest,
-        movimentId: number
+        movimentId: number,
+        ownerId: number
     ) {
         const isOwnerUser = data.userType === 'OWNER';
 
@@ -229,7 +208,10 @@ class CreateStockService {
         });
 
         await this.auditLogService.create({
-            action: "STOCK_MOVIMENT_CREATE",
+            action: data.type === 'TRANSFER' ? "STOCK_TRANSFER" : "STOCK_MOVIMENT_CREATE",
+            ownerId: ownerId, 
+            productId: data.productId,
+            storeId: data.storeId,
             details: {
                 movimentId,
                 type: data.type,
@@ -242,9 +224,9 @@ class CreateStockService {
             },
             userId: isOwnerUser ? data.performedByUserId : undefined,
             storeUserId: !isOwnerUser ? data.performedByUserId : undefined,
-            storeId: data.storeId,
             ipAddress: data.ipAddress,
-            userAgent: data.userAgent
+            userAgent: data.userAgent,
+            isOwner: isOwnerUser
         }, tx);
     }
 
@@ -252,36 +234,28 @@ class CreateStockService {
         if (!['IN', 'OUT', 'TRANSFER'].includes(data.type)) {
             throw new ValidationError("InvalidType");
         }
-
         if (!Number.isInteger(data.productId) || data.productId <= 0) {
             throw new ValidationError("InvalidProductId");
         }
-
         if (!Number.isInteger(data.storeId) || data.storeId <= 0) {
             throw new ValidationError("InvalidStoreId");
         }
-
         if (!Number.isInteger(data.stock) || !Number.isSafeInteger(data.stock) || data.stock <= 0) {
             throw new ValidationError("InvalidStock");
         }
-
         if (data.stock > 1_000_000) {
             throw new ValidationError("StockLimitExceeded");
         }
-
         if (!Number.isInteger(data.performedByUserId) || data.performedByUserId <= 0) {
             throw new ValidationError("InvalidUserId");
         }
-
         if (!['OWNER', 'STORE_USER'].includes(data.userType)) {
             throw new ValidationError("InvalidUserType");
         }
-
         if (data.type === 'TRANSFER') {
             if (!data.destinationStoreId || !Number.isInteger(data.destinationStoreId) || data.destinationStoreId <= 0) {
                 throw new ValidationError("InvalidDestinationStoreId");
             }
-
             if (data.destinationStoreId === data.storeId) {
                 throw new ValidationError("SameStoreTransferNotAllowed");
             }

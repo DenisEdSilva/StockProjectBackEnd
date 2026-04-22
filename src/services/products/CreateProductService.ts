@@ -43,15 +43,15 @@ class CreateProductService {
 
             if (!store) {
                 throw new NotFoundError("StoreNotFound");
-            };
+            }
 
             if (data.userType === 'OWNER' && store.ownerId !== data.performedByUserId) {
                 throw new ForbiddenError("UnauthorizedAccess");
-            };
+            }
 
             if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
                 throw new ForbiddenError("UnauthorizedAccess");
-            };
+            }
 
             const category = await tx.category.findFirst({
                 where: { 
@@ -67,9 +67,11 @@ class CreateProductService {
 
             if (!category) {
                 throw new NotFoundError("CategoryNotFoundInThisStore");
-            };
+            }
 
-            const finalSku = data.sku ? this.normalizeSku(data.sku) : await this.generateGenericSmartSku(category.name, data.name)
+            const finalSku = data.sku 
+                ? this.normalizeSku(data.sku) 
+                : await this.generateGenericSmartSku(category.name, data.name);
 
             let catalogProduct = await tx.productCatalog.findUnique({
                 where: {
@@ -114,7 +116,7 @@ class CreateProductService {
             });
 
             if (existingInventory && !existingInventory.isDeleted) {
-                throw new ConflictError("ProductAlreadyInStoreInventory")
+                throw new ConflictError("ProductAlreadyInStoreInventory");
             }
 
             const inventoryItem = await tx.storeInventory.upsert({
@@ -125,13 +127,14 @@ class CreateProductService {
                     }
                 },
                 update: {
-                    price: data.price,
+                    price: new Prisma.Decimal(data.price),
                     isDeleted: false
                 },
                 create: {
                     productId: catalogProduct.id,
                     storeId: data.storeId,
-                    price: new Prisma.Decimal(data.price)
+                    price: new Prisma.Decimal(data.price),
+                    stock: 0
                 }
             });
 
@@ -142,13 +145,15 @@ class CreateProductService {
             });
 
             await this.auditLogService.create({
-                action: "PRODUCT_CREATE",
+                action: existingInventory ? "PRODUCT_CATALOG_LINK" : "PRODUCT_CREATE",
                 details: { 
                     productId: catalogProduct.id, 
                     sku: finalSku, 
-                    name: catalogProduct.name
+                    name: catalogProduct.name,
+                    price: data.price
                 },
                 storeId: data.storeId,
+                ownerId: store.ownerId,
                 userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
                 storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
                 ipAddress: data.ipAddress,

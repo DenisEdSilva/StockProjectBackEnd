@@ -21,7 +21,7 @@ class GetStoreByIdService {
                 ownerId: true,
                 _count: {
                     select: {
-                        products: { where: { isDeleted: false } },
+                        inventory: { where: { isDeleted: false } },
                         categories: { where: { isDeleted: false } },
                         storeUsers: { where: { isDeleted: false } }
                     }

@@ -34,31 +34,48 @@ class RevertStockService {
             this.checkAuthorization(data, store.ownerId);
 
             const movement = await tx.stockMoviment.findUnique({
-                where: { id: data.movementId },
-                include: { product: true }
+                where: { id: data.movementId }
             });
 
             if (!movement || movement.isDeleted) throw new NotFoundError("MovementNotFound");
             if (!movement.isValid) throw new ConflictError("MovementAlreadyReverted");
             if (movement.storeId !== data.storeId) throw new ForbiddenError("MovementDoesNotBelongToStore");
 
-            if (movement.type === StockMovimentType.TRANSFER) {
-                return await this.handleTransferRevert(tx, data, movement, store.ownerId);
+            const originInventory = await tx.storeInventory.findUnique({
+                where: {
+                    storeId_productId: {
+                        storeId: data.storeId,
+                        productId: movement.productId
+                    }
+                }
+            });
+
+            if (!originInventory || originInventory.isDeleted) {
+                throw new NotFoundError("ProductNotFoundInStoreInventory");
             }
 
-            return await this.handleStandardRevert(tx, data, movement, store.ownerId);
+            if (movement.type === StockMovimentType.TRANSFER) {
+                return await this.handleTransferRevert(tx, data, movement, originInventory, store.ownerId);
+            }
+
+            return await this.handleStandardRevert(tx, data, movement, originInventory, store.ownerId);
         });
     }
 
-    private async handleStandardRevert(tx: Prisma.TransactionClient, data: any, movement: any, ownerId: number) {
+    private async handleStandardRevert(
+        tx: Prisma.TransactionClient, 
+        data: any, 
+        movement: any, 
+        originInventory: any, 
+        ownerId: number
+    ) {
         const reverseType = movement.type === StockMovimentType.IN 
             ? StockMovimentType.OUT 
             : StockMovimentType.IN;
 
-        const updated = await tx.product.updateMany({
+        const updated = await tx.storeInventory.updateMany({
             where: {
-                id: movement.productId,
-                storeId: movement.storeId,
+                id: originInventory.id,
                 isDeleted: false,
                 ...(reverseType === StockMovimentType.OUT && { stock: { gte: movement.stock } })
             },
@@ -81,27 +98,34 @@ class RevertStockService {
                 productId: movement.productId,
                 type: reverseType,
                 stock: movement.stock,
-                previousStock: movement.product.stock,
+                previousStock: originInventory.stock,
                 storeId: movement.storeId,
                 isValid: true,
                 createdBy: data.performedByUserId
             }
         });
 
-        await this.finalizeRevert(tx, data, movement.id, newMovement.id, ownerId);
+        await this.finalizeRevert(tx, data, movement, newMovement.id, ownerId);
 
         return { message: "MovementRevertedSuccessfully", id: newMovement.id };
     }
 
-    private async handleTransferRevert(tx: Prisma.TransactionClient, data: any, movement: any, ownerId: number) {
+    private async handleTransferRevert(
+        tx: Prisma.TransactionClient, 
+        data: any, 
+        movement: any, 
+        originInventory: any, 
+        ownerId: number
+    ) {
         if (!movement.destinationStoreId) {
             throw new ValidationError("InvalidTransferMovement");
         }
 
-        const updateDest = await tx.product.updateMany({
+        const updateDest = await tx.storeInventory.updateMany({
             where: {
-                sku: movement.product.sku,
                 storeId: movement.destinationStoreId,
+                productId: movement.productId,
+                
                 stock: { gte: movement.stock },
                 isDeleted: false
             },
@@ -114,8 +138,8 @@ class RevertStockService {
             throw new ConflictError("InsufficientStockInDestinationStore");
         }
 
-        await tx.product.update({
-            where: { id: movement.productId },
+        await tx.storeInventory.update({
+            where: { id: originInventory.id },
             data: { stock: { increment: movement.stock } }
         });
 
@@ -131,23 +155,42 @@ class RevertStockService {
             });
         }
 
-        await this.finalizeRevert(tx, data, movement.id, null, ownerId);
+        await this.finalizeRevert(tx, data, movement, null, ownerId);
 
         return { message: "TransferRevertedSuccessfully" };
     }
 
-    private async finalizeRevert(tx: Prisma.TransactionClient, data: any, oldId: number, newId: number | null, ownerId: number) {
-        await this.activityTracker.track({ tx, storeId: data.storeId });
+    private async finalizeRevert(
+        tx: Prisma.TransactionClient, 
+        data: any, 
+        oldMovement: any, 
+        newId: number | null, 
+        ownerId: number
+    ) {
+        const isOwnerUser = data.userType === 'OWNER';
+
+        await this.activityTracker.track({ 
+            tx, 
+            storeId: data.storeId,
+            userId: isOwnerUser ? data.performedByUserId : undefined
+        });
 
         await this.auditLogService.create({
             action: "STOCK_REVERT",
-            details: { originalId: oldId, revertId: newId },
+            ownerId: ownerId,
+            productId: oldMovement.productId,
             storeId: data.storeId,
-            userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
-            storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
+            details: { 
+                originalId: oldMovement.id, 
+                revertId: newId,
+                type: oldMovement.type,
+                stockReverted: oldMovement.stock
+            },
+            userId: isOwnerUser ? data.performedByUserId : undefined,
+            storeUserId: !isOwnerUser ? data.performedByUserId : undefined,
             ipAddress: data.ipAddress,
             userAgent: data.userAgent,
-            isOwner: data.userType === 'OWNER'
+            isOwner: isOwnerUser
         }, tx);
     }
 
