@@ -22,10 +22,14 @@ class AuditLogService {
                 throw new ValidationError("Usuário não autorizado");
             }
 
-            const store = await prismaClient.store.findUnique({
+            const store = await tx.store.findUnique({
                 where: { id: storeId, isDeleted: false },
                 select: { ownerId: true }
             });
+
+            if (!store) {
+                throw new NotFoundError("Loja não encontrada");
+            }
 
             if (filters.userType === 'OWNER' && store.ownerId !== filters.performedByUserId) {
                 throw new ForbiddenError("UnauthorizedAccess");
@@ -43,9 +47,21 @@ class AuditLogService {
             const where: Prisma.AuditLogWhereInput = {
                 ownerId: store.ownerId,
                 OR: [
-                    {storeId: storeId}
+                    { storeId: storeId },
+                    { 
+  
+                        action: { 
+                            in: [
+                                'PRODUCT_UPDATE', 
+                                'PRODUCT_DELETE_GLOBAL', 
+                                'PRODUCT_CATALOG_LINK'
+                            ]
+                        },
+                        storeId: { 
+                            not: storeId 
+                        }
+                    }
                 ],
-                storeId,
                 ...(filters.startDate && filters.endDate && {
                     createdAt: {
                         gte: new Date(filters.startDate),
@@ -66,20 +82,9 @@ class AuditLogService {
                 tx.auditLog.findMany({
                     where,
                     include: {
-                        user: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true
-                            }
-                        },
-                        storeUser: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true
-                            }
-                        }
+                        user: { select: { id: true, name: true, email: true } },
+                        storeUser: { select: { id: true, name: true, email: true } },
+                        store: { select: { name: true } }
                     },
                     skip: (page - 1) * limit,
                     take: limit,
@@ -94,19 +99,23 @@ class AuditLogService {
 
             const formattedLogs = logs.map(log => {
                 const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                
+                const isExternalLog = log.storeId !== null && log.storeId !== storeId;
+                const externalPrefix = isExternalLog && log.store ? `[Via ${log.store.name}] ` : "";
+                
+                const finalUserName = isExternalLog ? "Sistema" : this.getUserName(log);
 
                 return {
                     ...log,
                     actionLabel: this.translateAction(log.action),
-                    description: this.buildNarrative(log.action, details),
-                    userName: this.getUserName(log),
+                    description: `${externalPrefix}${this.buildNarrative(log.action, details)}`,
+                    userName: finalUserName,
                     createdAt: log.createdAt.toISOString()
                 };
             });
 
-            const users = this.getDistinctUsers(logs)
-
-            const actions = [... new Set(logs.map(log => log.action))]
+            const users = this.getDistinctUsers(logs).filter(u => u.name !== "Sistema");
+            const actions = [...new Set(logs.map(log => log.action))];
 
             return {
                 data: formattedLogs,
@@ -144,16 +153,16 @@ class AuditLogService {
             case 'PRODUCT_UPDATE':
                 let narrative = `Editou o produto "${details.new?.name || details.name}". `;
 
-                    if (details.old?.price !== details.new?.price) {
-                        narrative += `Preço alterado de R$${details.old?.price} para R$${details.new?.price}. `;
-                    }
-                    if (details.old?.name !== details.new?.name) {
-                        narrative += `[ALTERAÇÃO GLOBAL] Nome alterado de "${details.old?.name}" para "${details.new?.name}". `;
-                    }
-                    if (details.old?.sku !== details.new?.sku) {
-                        narrative += `[ALTERAÇÃO GLOBAL] SKU alterado de "${details.old?.sku}" para "${details.new?.sku}". `;
-                    }
-                    return narrative.trim();
+                if (details.old?.price !== details.new?.price) {
+                    narrative += `Preço alterado de R$${details.old?.price} para R$${details.new?.price}. `;
+                }
+                if (details.old?.name !== details.new?.name) {
+                    narrative += `[ALTERAÇÃO GLOBAL] Nome alterado de "${details.old?.name}" para "${details.new?.name}". `;
+                }
+                if (details.old?.sku !== details.new?.sku) {
+                    narrative += `[ALTERAÇÃO GLOBAL] SKU alterado de "${details.old?.sku}" para "${details.new?.sku}". `;
+                }
+                return narrative.trim();
 
             case 'PRODUCT_DELETE_LOCAL':
                 return `Removeu o produto "${details.name}" (SKU: ${details.sku}) apenas do estoque desta loja.`;
@@ -174,7 +183,7 @@ class AuditLogService {
                     return `Consultou a listagem de ${resource}`;
                 }
                 if (action.includes('_LOGIN')) {
-                    return `Realizou login na plataforma`
+                    return `Realizou login na plataforma`;
                 }
                 return "Realizou uma alteração nas configurações";
         }
@@ -242,7 +251,6 @@ class AuditLogService {
             'STOCK_MOVIMENT_CREATE': 'Movimentação de Estoque',
             'STOCK_TRANSFER': 'Transferência de Estoque',
             'STOCK_REVERT': 'Reversão de Estoque',
-
         };
     
         return actionTranslations[action] || action;
