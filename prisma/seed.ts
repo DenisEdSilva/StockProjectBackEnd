@@ -6,32 +6,37 @@ const permissions = [
 		// Rotas de STORE
 		{ action: PermissionAction.POST, resource: 'STORE', name: 'LOJA - CRIAR' },
 		{ action: PermissionAction.GET, resource: 'STORE', name: 'LOJA - BUSCAR' },
-		{ action: PermissionAction.PUT, resource: 'STORE', name: 'LOJA - VISUALIZAR' },
+		{ action: PermissionAction.PUT, resource: 'STORE', name: 'LOJA - EDITAR' },
 		{ action: PermissionAction.DELETE, resource: 'STORE', name: 'LOJA - DELETAR' },
 
 		// Rotas de ROLE
 		{action: PermissionAction.POST, resource: 'ROLE', name: 'CARGO - CRIAR'},
 		{action: PermissionAction.GET, resource: 'ROLE', name: 'CARGO - BUSCAR'},
-		{action: PermissionAction.PUT, resource: 'ROLE', name: 'CARGO - VISUALIZAR'},
+		{action: PermissionAction.PUT, resource: 'ROLE', name: 'CARGO - EDITAR'},
 		{action: PermissionAction.DELETE, resource: 'ROLE', name: 'CARGO - DELETAR'},
 
 		// Rotas de STORE_USER
 		{action: PermissionAction.POST, resource: 'STORE_USER', name: 'USUÁRIO - CRIAR'},
 		{action: PermissionAction.GET, resource: 'STORE_USER', name: 'USUÁRIO - BUSCAR'},
-		{action: PermissionAction.PUT, resource: 'STORE_USER', name: 'USUÁRIO - VISUALIZAR'},
+		{action: PermissionAction.PUT, resource: 'STORE_USER', name: 'USUÁRIO - EDITAR'},
 		{action: PermissionAction.DELETE, resource: 'STORE_USER', name: 'USUÁRIO - DELETAR'},
 
 		// Rotas de CATEGORY
 		{action: PermissionAction.POST, resource: 'CATEGORY', name: 'CATEGORIA - CRIAR'},
 		{action: PermissionAction.GET, resource: 'CATEGORY', name: 'CATEGORIA - BUSCAR'},
-		{action: PermissionAction.PUT, resource: 'CATEGORY', name: 'CATEGORIA - VISUALIZAR'},
+		{action: PermissionAction.PUT, resource: 'CATEGORY', name: 'CATEGORIA - EDITAR'},
 		{action: PermissionAction.DELETE, resource: 'CATEGORY', name: 'CATEGORIA - DELETAR'},
 
-		// Rotas de PRODUCT
-		{action: PermissionAction.POST, resource: 'PRODUCT', name: 'PRODUTO - CRIAR'},
-		{action: PermissionAction.GET, resource: 'PRODUCT', name: 'PRODUTO - BUSCAR'},
-		{action: PermissionAction.PUT, resource: 'PRODUCT', name: 'PRODUTO - VISUALIZAR'},
-		{action: PermissionAction.DELETE, resource: 'PRODUCT', name: 'PRODUTO - DELETAR'},
+		// PERMISSÕES DA MATRIZ
+		{action: PermissionAction.POST, resource: 'CATALOG', name: 'CATÁLOGO - CRIAR PRODUTO'},
+		{action: PermissionAction.PUT,  resource: 'CATALOG', name: 'CATÁLOGO - EDITAR DADOS GLOBAIS'},
+		{action: PermissionAction.DELETE, resource: 'CATALOG', name: 'CATÁLOGO - DELETAR GLOBAL'},
+
+		// PERMISSÕES DA LOJA
+		{action: PermissionAction.POST, resource: 'INVENTORY', name: 'ESTOQUE - ADICIONAR PRODUTO NA LOJA'},
+		{action: PermissionAction.PUT,  resource: 'INVENTORY', name: 'ESTOQUE - EDITAR PREÇO/QUANTIDADE'},
+		{action: PermissionAction.GET,  resource: 'INVENTORY', name: 'ESTOQUE - VISUALIZAR'},
+		{action: PermissionAction.DELETE, resource: 'INVENTORY', name: 'ESTOQUE - REMOVER DA LOJA'},
 
 		// Rotas de STOCK
 		{action: PermissionAction.POST, resource: 'STOCK', name: 'MOVIMENTAÇÃO - CRIAR'},

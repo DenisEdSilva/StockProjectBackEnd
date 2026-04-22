@@ -7,14 +7,15 @@ class CreateProductController {
 
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
-            const { banner, name, price, description, categoryId } = req.body;
+            const { sku, banner, name, price, description, categoryId } = req.body;
             const { storeId } = req.params;
 
             const product = await this.createProductService.execute({
-                banner,
+                sku,
                 name,
-                price: new Prisma.Decimal(price),
                 description,
+                banner,
+                price: price,
                 categoryId: Number(categoryId),
                 storeId: Number(storeId),
                 performedByUserId: req.user.id,

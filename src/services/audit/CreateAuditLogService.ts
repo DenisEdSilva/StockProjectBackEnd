@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 interface CreateLogRequest {
     action: string;
     storeId?: number;
+    ownerId?: number;
+    productId?: number;
     userId?: number;
     storeUserId?: number;
     details?: any;
@@ -20,6 +22,8 @@ class CreateAuditLogService {
             data: {
                 action: data.action,
                 storeId: data.storeId,
+                ownerId: data.ownerId,
+                productId: data.productId,
                 userId: data.userId,
                 storeUserId: data.storeUserId,
                 details: data.details || {},

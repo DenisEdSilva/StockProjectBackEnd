@@ -41,6 +41,10 @@ class AuditLogService {
             this.validatePagination(page, limit);
 
             const where: Prisma.AuditLogWhereInput = {
+                ownerId: store.ownerId,
+                OR: [
+                    {storeId: storeId}
+                ],
                 storeId,
                 ...(filters.startDate && filters.endDate && {
                     createdAt: {
@@ -121,25 +125,45 @@ class AuditLogService {
     private buildNarrative(action: string, details: any): string {
         if (!details) return "Realizou uma operação no sistema";
 
-        switch (action) {
-            case 'STOCK_MOVIMENT_CREATE':
-                const type = details.type === 'IN' ? 'Entrada' : 'Saída';
-                return `${type} de ${details.stock} unidades. | SKU: ${details.sku} | ${details.productName} (#${details.productId})`;
-            
-            case 'PRODUCT_CREATE':
-                return `Cadastrou o produto: "${details.name}"`;
-                
-            case 'CATEGORY_CREATE':
-                return `Criou a categoria: "${details.name}"`;
+        switch (action) {                
+            case 'STORE_CREATE':
+                return `Inaugurou a unidade: "${details.name}" em ${details.city}`;
 
             case 'ROLE_CREATE':
                 return `Definiu o novo cargo: "${details.name}"`;
 
-            case 'STORE_CREATE':
-                return `Inaugurou a unidade: "${details.name}" em ${details.city}`;
+            case 'CATEGORY_CREATE':
+                return `Criou a categoria: "${details.name}"`;
+
+            case 'PRODUCT_CREATE':
+                return `Cadastrou um novo produto na matriz e no estoque local: "${details.name}" (SKU: ${details.sku})`;
+
+            case 'PRODUCT_CATALOG_LINK':
+                return `Adicionou o produto existente na matriz ao estoque desta loja: "${details.name}" (SKU: ${details.sku})`;
 
             case 'PRODUCT_UPDATE':
-                return `Editou informações do produto: "${details.name}"`;
+                let narrative = `Editou o produto "${details.new?.name || details.name}". `;
+
+                    if (details.old?.price !== details.new?.price) {
+                        narrative += `Preço alterado de R$${details.old?.price} para R$${details.new?.price}. `;
+                    }
+                    if (details.old?.name !== details.new?.name) {
+                        narrative += `[ALTERAÇÃO GLOBAL] Nome alterado de "${details.old?.name}" para "${details.new?.name}". `;
+                    }
+                    if (details.old?.sku !== details.new?.sku) {
+                        narrative += `[ALTERAÇÃO GLOBAL] SKU alterado de "${details.old?.sku}" para "${details.new?.sku}". `;
+                    }
+                    return narrative.trim();
+
+            case 'PRODUCT_DELETE_LOCAL':
+                return `Removeu o produto "${details.name}" (SKU: ${details.sku}) apenas do estoque desta loja.`;
+
+            case 'PRODUCT_DELETE_GLOBAL':
+                return `[ALERTA GLOBAL] Excluiu definitivamente o produto "${details.name}" (SKU: ${details.sku}) de TODAS as lojas da rede.`;
+
+            case 'STOCK_MOVIMENT_CREATE':
+                const type = details.type === 'IN' ? 'Entrada' : 'Saída';
+                return `${type} de ${details.stock} unidades. | SKU: ${details.sku} | ${details.productName} (#${details.productId})`;
 
             default:
                 if (action.includes('UPDATE')) {
@@ -209,12 +233,16 @@ class AuditLogService {
             'UPDATE_STORE_USER': 'Atualização de Usuário da Loja',
             'CATEGORY_CREATE': 'Criação de Categoria',
             'CATEGORY_UPDATE': 'Atualização de Categoria',
-            'PRODUCT_CREATE': 'Criação de Produto',
+            'PRODUCT_CREATE': 'Criação de Produto (Local)',
+            'PRODUCT_CATALOG_LINK': 'Vínculo de Produto da Matriz',
             'PRODUCT_UPDATE': 'Atualização de Produto',
+            'PRODUCT_DELETE_LOCAL': 'Remoção de Produto da Loja',
+            'PRODUCT_DELETE_GLOBAL': 'Exclusão Global de Produto',
             'STOCK_MOVIMENT_LIST': 'Listagem de Movimentações',
             'STOCK_MOVIMENT_CREATE': 'Movimentação de Estoque',
             'STOCK_TRANSFER': 'Transferência de Estoque',
             'STOCK_REVERT': 'Reversão de Estoque',
+
         };
     
         return actionTranslations[action] || action;

@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 interface ProductRequest {
     banner: string;
     name: string;
-    price: Prisma.Decimal;
+    price: string | number;
     description: string;
     sku?: string;
     categoryId: number;
@@ -71,29 +71,67 @@ class CreateProductService {
 
             const finalSku = data.sku ? this.normalizeSku(data.sku) : await this.generateGenericSmartSku(category.name, data.name)
 
-            const existingInStore = await tx.product.findFirst({
+            let catalogProduct = await tx.productCatalog.findUnique({
                 where: {
-                    sku: finalSku, storeId: data.storeId
+                    ownerId_sku: {
+                        sku: finalSku,
+                        ownerId: store.ownerId,
+                    }
                 }
             });
 
-            const product = await tx.product.create({
-                data: {
-                    banner: data.banner,
-                    name: data.name,
-                    price: data.price,
-                    description: data.description,
-                    sku: finalSku,
-                    categoryId: data.categoryId,
-                    storeId: data.storeId
+            if (!catalogProduct) {
+                catalogProduct = await tx.productCatalog.create({
+                    data: {
+                        sku: finalSku,
+                        name: data.name,
+                        description: data.description,
+                        banner: data.banner,
+                        ownerId: store.ownerId,
+                        categoryId: data.categoryId
+                    }
+                });
+            } else if (catalogProduct.isDeleted) {
+                catalogProduct = await tx.productCatalog.update({
+                    where: { 
+                        id: catalogProduct.id 
+                    },
+                    data: { 
+                        isDeleted: false,
+                        name: data.name,
+                        categoryId: data.categoryId 
+                    }
+                });
+            }
+
+            const existingInventory = await tx.storeInventory.findUnique({
+                where: {
+                    storeId_productId: {
+                        storeId: data.storeId,
+                        productId: catalogProduct.id
+                    }
+                }
+            });
+
+            if (existingInventory && !existingInventory.isDeleted) {
+                throw new ConflictError("ProductAlreadyInStoreInventory")
+            }
+
+            const inventoryItem = await tx.storeInventory.upsert({
+                where: {
+                    storeId_productId: {
+                        storeId: data.storeId,
+                        productId: catalogProduct.id
+                    }
                 },
-                select: { 
-                    id: true, 
-                    sku: true, 
-                    name: true,
-                    description: true, 
-                    price: true, 
-                    stock: true, 
+                update: {
+                    price: data.price,
+                    isDeleted: false
+                },
+                create: {
+                    productId: catalogProduct.id,
+                    storeId: data.storeId,
+                    price: new Prisma.Decimal(data.price)
                 }
             });
 
@@ -105,7 +143,11 @@ class CreateProductService {
 
             await this.auditLogService.create({
                 action: "PRODUCT_CREATE",
-                details: { productId: product.id, sku: product.sku, name: product.name },
+                details: { 
+                    productId: catalogProduct.id, 
+                    sku: finalSku, 
+                    name: catalogProduct.name
+                },
                 storeId: data.storeId,
                 userId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
                 storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined,
@@ -114,7 +156,11 @@ class CreateProductService {
                 isOwner: data.userType === 'OWNER'
             }, tx);
 
-            return product;
+            return {
+                ...catalogProduct,
+                price: inventoryItem.price,
+                storeInventoryId: inventoryItem.id
+            };
         });
     }
 
@@ -125,7 +171,6 @@ class CreateProductService {
     private async generateGenericSmartSku(categoryName: string, productName: string): Promise<string> {
         const catPart = categoryName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase().padEnd(3, 'X');
         const namePart = productName.replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase().padEnd(4, 'X');
-
         const hashPart = Math.random().toString(36).substring(2, 6).toUpperCase();
 
         return `${catPart}-${namePart}-${hashPart}`;

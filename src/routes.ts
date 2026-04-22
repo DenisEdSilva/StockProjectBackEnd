@@ -473,7 +473,7 @@ router.delete("/stores/:storeId/categories/:categoryId",
 // PRODUCT ROUTES
 router.post("/stores/:storeId/products",
 	authenticated,
-	authorized("POST", "PRODUCT"),
+	authorized("POST", "INVENTORY"),
 	(req: Request, res: Response, next: NextFunction) => {
 		createProductController.handle(req, res, next);
 	}
@@ -481,7 +481,7 @@ router.post("/stores/:storeId/products",
 
 router.get("/stores/:storeId/products",
 	authenticated,
-	authorized("GET", "PRODUCT"),
+	authorized("GET", "INVENTORY"),
 	(req: Request, res: Response, next: NextFunction) => {
 		listProductController.handle(req, res, next);
 	}
@@ -489,7 +489,7 @@ router.get("/stores/:storeId/products",
 
 router.get("/stores/:storeId/products/:productId",
 	authenticated,
-	authorized("GET", "PRODUCT"),
+	authorized("GET", "INVENTORY"),
 	(req: Request, res: Response, next: NextFunction) => {
 		getProductByIdController.handle(req, res, next);
 	}
@@ -497,7 +497,7 @@ router.get("/stores/:storeId/products/:productId",
 
 router.put("/stores/:storeId/products/:productId",
 	authenticated,
-	authorized("PUT", "PRODUCT"),
+	authorized("PUT", "INVENTORY"),
 	(req: Request, res: Response, next: NextFunction) => {
 		updateProductController.handle(req, res, next);
 	}
@@ -505,7 +505,7 @@ router.put("/stores/:storeId/products/:productId",
 
 router.delete("/stores/:storeId/products/:productId",
 	authenticated,
-	authorized("DELETE", "PRODUCT"),
+	authorized("DELETE", "INVENTORY"),
 	(req: Request, res: Response, next: NextFunction) => {
 		deleteProductController.handle(req, res, next);
 	}
