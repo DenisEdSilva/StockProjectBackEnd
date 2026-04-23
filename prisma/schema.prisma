@@ -77,6 +77,7 @@ model StoreUser {
   store    Store    @relation(fields: [storeId], references: [id], name: "StoreUserStoreRelation")
   role      Role     @relation(fields: [roleId], references: [id])
   AuditLog AuditLog[]
+  userPermissions UserPermission[]
 
   @@unique([email, storeId])
   @@index([roleId])
@@ -119,9 +120,9 @@ model Permission {
   updatedAt DateTime @updatedAt @db.Timestamptz()
 
   role RolePermissionAssociation[] @relation("PermissionToRole")
-
+  userPermissions UserPermission[] @relation("PermissionToUser")
+ 
   @@unique([action, resource])
-  @@index([action, resource])
 }
 
 model RolePermissionAssociation {
@@ -131,9 +132,20 @@ model RolePermissionAssociation {
   createdAt   DateTime @default(now()) @db.Timestamptz()
   updatedAt   DateTime @updatedAt @db.Timestamptz()
 
-  role        Role       @relation(fields: [roleId], references: [id], name: "RoleToPermission")
-  permission  Permission @relation(fields: [permissionId], references: [id], name: "PermissionToRole")
+  role        Role       @relation(fields: [roleId], references: [id], name: "RoleToPermission", onDelete: Cascade)
+  permission  Permission @relation(fields: [permissionId], references: [id], name: "PermissionToRole", onDelete: Cascade)
+
   @@unique([roleId, permissionId])
+}
+
+model UserPermission {
+  userId Int
+  permissionId Int
+
+  storeUser    StoreUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], name: "PermissionToUser", onDelete: Cascade)
+
+  @@id([userId, permissionId])
 }
 
 model Category {

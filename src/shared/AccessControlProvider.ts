@@ -9,6 +9,14 @@ export interface ACLResponse {
     permissions: Array<{ action: string; resource: string }>;
 }
 
+interface PermissionSelect {
+    permission: {
+        id: number;
+        action: string;
+        resource: string;
+    }
+}
+
 class AccessControlProvider {
     async uintToACL(storeUserId: number, tx: any): Promise<ACLResponse> {
         if (!Number.isInteger(storeUserId)) {
@@ -32,10 +40,22 @@ class AccessControlProvider {
                             select: {
                                 permission: {
                                     select: { 
+                                        id: true,
                                         action: true, 
                                         resource: true 
                                     }
                                 }
+                            }
+                        }
+                    }
+                },
+                userPermissions: {
+                    select: {
+                        permission: {
+                            select: { 
+                                id: true, 
+                                action: true, 
+                                resource: true
                             }
                         }
                     }
@@ -45,10 +65,23 @@ class AccessControlProvider {
 
         if (!user) throw new NotFoundError("StoreUserNotFound");
 
-        const permissions = user.role.permissions.map((rp: any) => ({
-            action: rp.permission.action,
-            resource: rp.permission.resource
-        }));
+        const allPermissionsMap = new Map<number, { action: string; resource: string }>();
+
+        user.role.permissions.forEach((rp: PermissionSelect) => {
+            allPermissionsMap.set(rp.permission.id, {
+                action: rp.permission.action,
+                resource: rp.permission.resource
+            });
+        });
+
+        user.userPermissions.forEach((up: PermissionSelect) => {
+            allPermissionsMap.set(up.permission.id, {
+                action: up.permission.action,
+                resource: up.permission.resource
+            });
+        });
+
+        const permissions = Array.from(allPermissionsMap.values());
 
         return {
             id: user.id,
