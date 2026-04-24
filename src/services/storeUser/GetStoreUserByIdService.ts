@@ -36,6 +36,18 @@ class GetStoreUserByIdService {
                     select: {
                         name: true
                     }
+                },
+                userPermissions: {
+                    include: {
+                        permission: {
+                            select: {
+                                id: true,
+                                name: true,
+                                action: true,
+                                resource: true
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -52,6 +64,8 @@ class GetStoreUserByIdService {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
+        console.log(storeUser.userPermissions)
+
         return {
             id: storeUser.id,
             name: storeUser.name,
@@ -60,7 +74,8 @@ class GetStoreUserByIdService {
             roleName: storeUser.role.name,
             storeId: storeUser.storeId,
             createdAt: storeUser.createdAt,
-            updatedAt: storeUser.updatedAt
+            updatedAt: storeUser.updatedAt,
+            userPermissions: storeUser.userPermissions.map(up => up.permission)
         };
     }
 }
