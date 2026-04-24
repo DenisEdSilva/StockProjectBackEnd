@@ -53,6 +53,7 @@ class ListStoreUserService {
                     name: true,
                     email: true,
                     storeId: true,
+                    roleId: true,
                     role: {
                         select: { 
                             id: true,
@@ -73,6 +74,7 @@ class ListStoreUserService {
                 id: user.id,
                 name: user.name,
                 email: user.email,
+                roleId: user.roleId,
                 role: {
                     id: user.role.id,
                     name: user.role.name
