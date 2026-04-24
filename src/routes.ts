@@ -83,6 +83,11 @@ import { GetStoreUserByIdService } from "./services/storeUser/GetStoreUserByIdSe
 const getStoreUserByIdService = new GetStoreUserByIdService();
 const getStoreUserByIdController = new GetStoreUserByIdController(getStoreUserByIdService);
 
+import { ListTransferDestinationsService } from "./services/store/ListTransferDestinationsService";
+import { ListTransferDestinationsController } from "./controllers/store/ListTransferDestinationsController";
+const listTransferDestinationsService = new ListTransferDestinationsService();
+const listTransferDestinationsController = new ListTransferDestinationsController(listTransferDestinationsService);
+
 import { UpdateStoreController } from "./controllers/store/UpdateStoreController";
 import { UpdateStoreService } from "./services/store/UpdateStoreService";
 const updateStoreService = new UpdateStoreService(auditLogCreate, tracker);
@@ -320,6 +325,13 @@ router.get("/stores/:storeId",
 	(req: Request, res: Response, next: NextFunction) => {
 		getStoreByIdController.handle(req, res, next);
 	}
+);
+router.get("/stores/:storeId/transfer-targets",
+    authenticated,
+	authorized("POST", "STOCK"),
+    (req: Request, res: Response, next: NextFunction) => {
+        listTransferDestinationsController.handle(req, res, next);
+    }
 );
 
 router.put("/stores/:storeId",
