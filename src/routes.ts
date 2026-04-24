@@ -328,7 +328,7 @@ router.get("/stores/:storeId",
 );
 router.get("/stores/:storeId/transfer-targets",
     authenticated,
-	authorized("POST", "STOCK"),
+	authorized("GET", "TRANSFER"),
     (req: Request, res: Response, next: NextFunction) => {
         listTransferDestinationsController.handle(req, res, next);
     }

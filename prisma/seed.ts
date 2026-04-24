@@ -9,6 +9,9 @@ const permissions = [
 		{ action: PermissionAction.PUT, resource: 'STORE', name: 'LOJA - EDITAR' },
 		{ action: PermissionAction.DELETE, resource: 'STORE', name: 'LOJA - DELETAR' },
 
+		// Rotas de target search
+		{ action: PermissionAction.GET, resource: 'TRANSFER', name: 'TRANSFERÊNCIA - VISUALIZAR DESTINOS' },
+
 		// Rotas de ROLE
 		{action: PermissionAction.POST, resource: 'ROLE', name: 'CARGO - CRIAR'},
 		{action: PermissionAction.GET, resource: 'ROLE', name: 'CARGO - BUSCAR'},
