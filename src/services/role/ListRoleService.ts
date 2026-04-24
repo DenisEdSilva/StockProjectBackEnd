@@ -41,6 +41,17 @@ class ListRoleService {
                 select: {
                     id: true,
                     name: true,
+                    permissions: {
+                        include: {
+                            permission: {
+                                select: {
+                                    id: true,
+                                    action: true,
+                                    resource: true
+                                }
+                            }
+                        }
+                    },
                     createdAt: true,
                     _count: { 
                         select: { 
@@ -56,8 +67,13 @@ class ListRoleService {
             prismaClient.role.count({ where: whereClause })
         ]);
 
+        const formattedRoles = roles.map(role => ({
+            ...role,
+            permissions: role.permissions.map(rp => rp.permission) 
+        }));
+
         return {
-            data: roles,
+            data: formattedRoles,
             pagination: {
                 page: data.page,
                 pageSize: data.pageSize,
