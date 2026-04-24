@@ -123,6 +123,7 @@ REDIS_URL="redis://localhost:6379"
 |-----------|----------|-----------|-----------|
 |   POST	  | /stores	 | Cria loja | POST:STORE |
 |    GET    | /stores | Lista as lojas do owner | GET:STORE |
+|    GET    | /stores | Lista de lojas do owner | POST: STOCK |
 |    PUT    | /stores/:storeId | Atualiza a loja | PUT:STORE |
 |  DELETE   | /stores/:storeId | Soft delete da loja | DELETE:STORE |
 |    PUT    | /stores/:storeId/revert | Reverte a deleção da loja | PUT:STORE_DELETE |
