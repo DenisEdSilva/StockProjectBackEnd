@@ -50,6 +50,7 @@ class ListMovimentStockService {
                     type: true,
                     stock: true,
                     previousStock: true,
+                    isValid: true,
                     destinationStoreId: true,
                     createdBy: true,
                     createdAt: true,
