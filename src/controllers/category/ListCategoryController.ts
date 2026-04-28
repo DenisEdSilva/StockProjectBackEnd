@@ -7,7 +7,15 @@ class ListCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { storeId } = req.params;
-            const { page, pageSize, search } = req.query;
+            const { 
+                page, 
+                pageSize, 
+                search,
+                startDate,
+                endDate,
+                sortBy,
+                sortOrder
+            } = req.query;
 
             const result = await this.listCategoryService.execute({ 
                 storeId: Number(storeId),
@@ -16,7 +24,11 @@ class ListCategoryController {
                 tokenStoreId: req.user.storeId,
                 page: page ? Number(page) : 1,
                 pageSize: pageSize ? Number(pageSize) : 10,
-                search: search as string
+                search: search as string,
+                startDate: startDate as string,
+                endDate: endDate as string,
+                sortBy: sortBy as 'name' | 'createdAt',
+                sortOrder: sortOrder as 'asc' | 'desc'
             });
 
             return res.status(200).json(result);

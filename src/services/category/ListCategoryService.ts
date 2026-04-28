@@ -1,4 +1,5 @@
 import prismaClient from "../../prisma";
+import { Prisma } from "@prisma/client";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
 
 interface ListCategoryRequest {
@@ -7,6 +8,10 @@ interface ListCategoryRequest {
     userType: string;
     tokenStoreId?: number;
     search?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: 'name' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
     page: number;
     pageSize: number;
 }
@@ -30,15 +35,21 @@ class ListCategoryService {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
-        const whereClause = {
+        const whereClause: Prisma.CategoryWhereInput = {
             storeId: data.storeId,
             isDeleted: false,
             ...(data.search && {
                 name: {
                     contains: data.search,
-                    mode: "insensitive" as const
+                    mode: "insensitive"
                 }
-            })
+            }),
+            ...(data.startDate || data.endDate ? {
+                createdAt: {
+                    ...(data.startDate && { gte: new Date(data.startDate) }),
+                    ...(data.endDate && { lte: new Date(data.endDate) })
+                }
+            }: {})
         };
 
         const [categories, total] = await Promise.all([
@@ -53,7 +64,9 @@ class ListCategoryService {
                         select: { products: { where: { isDeleted: false } } } 
                     }
                 },
-                orderBy: { name: 'asc' },
+                orderBy: { 
+                    [data.sortBy || 'name']: data.sortOrder || 'asc' 
+                },
                 skip: (data.page - 1) * data.pageSize,
                 take: data.pageSize
             }),
