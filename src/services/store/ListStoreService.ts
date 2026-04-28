@@ -1,8 +1,14 @@
 import prismaClient from "../../prisma";
 import { ForbiddenError } from "../../errors";
 
+interface ListStoreRequest {
+    userId: number;
+    userType: string;
+    tokenStoreId?: number;
+}
+
 class ListStoreService {
-    async execute(data: any) {
+    async execute(data: ListStoreRequest) {
         if (data.userType === 'STORE_USER') {
             if (!data.tokenStoreId) {
                 throw new ForbiddenError("StoreContextMissing");
