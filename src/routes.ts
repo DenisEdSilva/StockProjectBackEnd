@@ -145,6 +145,11 @@ import { UpdateStoreUserService } from "./services/storeUser/UpdateStoreUserServ
 const updateStoreUserService = new UpdateStoreUserService(auditLogCreate, tracker);
 const updateStoreUserController = new UpdateStoreUserController(updateStoreUserService);
 
+import { UpdateStoreUserProfileController } from "./controllers/storeUser/UpdateStoreUserProfileController";
+import { UpdateStoreUserProfileService } from "./services/storeUser/UpdateStoreUserProfileService";
+const updateStoreUserProfileService = new UpdateStoreUserProfileService(auditLogCreate, tracker);
+const updateStoreUserProfileController = new UpdateStoreUserProfileController(updateStoreUserProfileService);
+
 import { DeleteStoreUserController } from "./controllers/storeUser/DeleteStoreUserController";
 import { DeleteStoreUserService } from "./services/storeUser/DeleteStoreUserService";
 const deleteStoreUserService = new DeleteStoreUserService(auditLogCreate, tracker);
@@ -430,6 +435,13 @@ router.put("/stores/:storeId/users/:storeUserId",
 	authorized("PUT", "STORE_USER"),
 	(req: Request, res: Response, next: NextFunction) => {
 		updateStoreUserController.handle(req, res, next);
+	}
+);
+
+router.put("/stores/:storeId/me",
+	authenticated,
+	(req: Request, res: Response, next: NextFunction) => {
+		updateStoreUserProfileController.handle(req, res, next);
 	}
 );
 

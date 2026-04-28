@@ -238,6 +238,7 @@ class AuditLogService {
             'ROLE_UPDATE': 'Atualização de Cargo',
             'CREATE_STORE_USER': 'Criação de Usuário da Loja',
             'UPDATE_STORE_USER': 'Atualização de Usuário da Loja',
+            'UPDATE_STORE_USER_PROFILE': 'Atualização de perfil de usuário da loja',
             'CATEGORY_CREATE': 'Criação de Categoria',
             'CATEGORY_UPDATE': 'Atualização de Categoria',
             'PRODUCT_CREATE': 'Criação de Produto (Local)',
