@@ -2,6 +2,7 @@ import prismaClient from "../../prisma";
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from "../../errors";
 import { CreateAuditLogService } from "../audit/CreateAuditLogService";
 import { ActivityTracker } from "../activity/ActivityTracker";
+import { UpdateCategoryRequest, UpdateCategoryResponse } from "@/types/category/UpdateCategory.types";
 
 class UpdateCategoryService {
     constructor(
@@ -9,17 +10,19 @@ class UpdateCategoryService {
         private activityTracker: ActivityTracker
     ) {}
 
-    async execute(data: any) {
+    async execute(data: UpdateCategoryRequest): Promise<UpdateCategoryResponse> {
         this.validateInput(data.name);
 
         return await prismaClient.$transaction(async (tx) => {
-            const category = await tx.category.findUnique({
+            const category = await tx.category.findFirst({
                 where: { 
                     id: data.categoryId,
                     storeId: data.storeId,
                     isDeleted: false 
                 },
-                include: { store: { select: { ownerId: true } } }
+                include: { 
+                    store: { select: { ownerId: true } } 
+                }
             });
 
             if (!category) {
@@ -52,13 +55,18 @@ class UpdateCategoryService {
             const updatedCategory = await tx.category.update({
                 where: { id: data.categoryId },
                 data: { name: data.name },
-                select: { id: true, name: true, updatedAt: true }
+                select: { 
+                    id: true, 
+                    name: true, 
+                    updatedAt: true 
+                }
             });
 
             await this.activityTracker.track({
                 tx,
                 storeId: data.storeId,
-                userId: data.performedByUserId
+                ownerId: data.userType === 'OWNER' ? data.performedByUserId : undefined,
+                storeUserId: data.userType === 'STORE_USER' ? data.performedByUserId : undefined
             });
 
             await this.auditLogService.create({
