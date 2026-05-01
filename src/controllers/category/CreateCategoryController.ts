@@ -7,13 +7,13 @@ class CreateCategoryController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { name } = req.body;
-            const { storeId } = req.params;
+            const storeId = Number(req.params.storeId);
 
             const category = await this.createCategoryService.execute({
                 performedByUserId: req.user.id,
                 userType: req.user.type,
                 tokenStoreId: req.user.storeId,
-                storeId: Number(storeId),
+                storeId,
                 name,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"] || ""
