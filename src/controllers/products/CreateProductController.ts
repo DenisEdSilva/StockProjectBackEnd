@@ -8,14 +8,14 @@ class CreateProductController {
     async handle(req: Request, res: Response, next: NextFunction) {
         try {
             const { sku, banner, name, price, description, categoryId } = req.body;
-            const { storeId } = req.params;
+            const storeId = Number(req.params.storeId);
 
             const product = await this.createProductService.execute({
                 sku,
                 name,
                 description,
                 banner,
-                price: price,
+                price: String(price),
                 categoryId: Number(categoryId),
                 storeId: Number(storeId),
                 performedByUserId: req.user.id,
