@@ -1,21 +1,43 @@
 import prismaClient from "../../prisma";
-import { ValidationError, NotFoundError, ForbiddenError } from "../../errors";
+import {
+    ValidationError,
+    NotFoundError,
+    ForbiddenError
+} from "../../errors";
 
-interface GetProductRequest {
-    storeId: number;
-    id: number;
-    performedByUserId: number;
-    userType: string;
-    tokenStoreId?: number;
-}
+import {
+    GetProductByIdRequest,
+    GetProductByIdResponse
+} from "@/types/product/GetProductById.types";
+
+import { mapGetProductById } from "@/mappers/product/getProductById.mapper";
 
 class GetProductByIdService {
-    async execute(data: GetProductRequest) {
-        if (!Number.isInteger(data.id) || !Number.isInteger(data.storeId)) {
-            throw new ValidationError("InvalidIdsProvided");
+    async execute(
+        data: GetProductByIdRequest
+    ): Promise<GetProductByIdResponse> {
+
+        this.validateInput(data);
+
+        const inventoryItem = await this.getProductOrFail(data);
+
+        this.validateAuthorization(data, inventoryItem.store.ownerId);
+
+        return mapGetProductById(inventoryItem);
+    }
+
+    private validateInput(data: GetProductByIdRequest) {
+        if (!Number.isInteger(data.id)) {
+            throw new ValidationError("InvalidProductId");
         }
 
-        const inventoryItem = await prismaClient.storeInventory.findFirst({ 
+        if (!Number.isInteger(data.storeId)) {
+            throw new ValidationError("InvalidStoreId");
+        }
+    }
+
+    private async getProductOrFail(data: GetProductByIdRequest) {
+        const inventoryItem = await prismaClient.storeInventory.findFirst({
             where: {
                 productId: data.id,
                 storeId: data.storeId,
@@ -53,26 +75,26 @@ class GetProductByIdService {
             throw new NotFoundError("ProductNotFoundInStore");
         }
 
-        if (data.userType === 'OWNER' && inventoryItem.store.ownerId !== data.performedByUserId) {
+        return inventoryItem;
+    }
+
+    private validateAuthorization(
+        data: GetProductByIdRequest,
+        ownerId: number
+    ) {
+        if (
+            data.userType === "OWNER" &&
+            ownerId !== data.performedByUserId
+        ) {
             throw new ForbiddenError("UnauthorizedAccess");
         }
 
-        if (data.userType === 'STORE_USER' && data.tokenStoreId !== data.storeId) {
+        if (
+            data.userType === "STORE_USER" &&
+            data.tokenStoreId !== data.storeId
+        ) {
             throw new ForbiddenError("UnauthorizedAccess");
         }
-
-        return {
-            id: inventoryItem.product.id,
-            storeInventoryId: inventoryItem.id,
-            name: inventoryItem.product.name,
-            price: inventoryItem.price,
-            stock: inventoryItem.stock,
-            banner: inventoryItem.product.banner,
-            sku: inventoryItem.product.sku,
-            description: inventoryItem.product.description,
-            categoryId: inventoryItem.product.categoryId,
-            category: inventoryItem.product.category,
-        };
     }
 }
 
