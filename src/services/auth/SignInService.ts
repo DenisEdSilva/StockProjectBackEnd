@@ -116,10 +116,9 @@ class SignInService {
             throw new ForbiddenError("AccountMarkedForDeletion");
         }
 
-        await this.activityTracker.track({ 
-            tx, 
-            userId: userData.id, 
-            userType: 'OWNER' 
+        await this.activityTracker.track({
+            tx,
+            ownerId: userData.id
         });
 
         const jwtSecret = process.env.JWT_SECRET;
@@ -208,11 +207,10 @@ class SignInService {
             }
         } catch (error) {}
 
-        await this.activityTracker.track({ 
-            tx, 
-            storeId: userData.storeId, 
-            userId: userData.id,
-            userType: 'STORE_USER'
+        await this.activityTracker.track({
+            tx,
+            storeId: userData.storeId,
+            storeUserId: userData.id
         });
 
         await this.auditLogService.create({
