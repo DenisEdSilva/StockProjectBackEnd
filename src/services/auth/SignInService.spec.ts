@@ -223,7 +223,7 @@ describe("SignInService", () => {
 			);
 		});
 
-		it("should throw if account is marked for deletion", async () => {
+		it("should throw if OWNER account is marked for deletion", async () => {
 			const mockUser = {
 				id: 1,
 				name: "Denis",
@@ -269,6 +269,56 @@ describe("SignInService", () => {
 			expect(sign).not.toHaveBeenCalled();
 			expect(redisClient.setEx).not.toHaveBeenCalled();
 			expect(activityTrackerMock.track).not.toHaveBeenCalled();
+			expect(auditLogMock.create).not.toHaveBeenCalled();
+		});
+
+		it("should throw if OWNER JWT_SECRET is missing", async () => {
+			const mockOwner = {
+				id: 1,
+				name: "Denis",
+				email: "denis@email.com",
+				password: "hashed-password",
+				isOwner: true,
+				markedForDeletionAt: null,
+				ownedStores: [{ id: 10, name: "Store A", isDeleted: false }]
+			};
+
+			const mockTx = {
+				user: {
+					findUnique: jest.fn().mockResolvedValue(mockOwner)
+				},
+				storeUser: {
+					findFirst: jest.fn().mockResolvedValue(null)
+				}
+			};
+
+			(prismaClient.$transaction as jest.Mock).mockImplementation(
+				async (callback) => callback(mockTx)
+			);
+
+			const mockedCompare = compare as jest.Mock<
+				Promise<boolean>,
+				[string, string]
+			>;
+			mockedCompare.mockResolvedValue(true);
+
+			delete process.env.JWT_SECRET;
+
+			await expect(service.execute({
+				email: "denis@teste.com",
+				password: "Password123",
+				ipAddress: "127.0.0.1",
+				userAgent: "jest"
+			})).rejects.toThrow("ServerConfigurationError")
+
+			expect(prismaClient.$transaction).toHaveBeenCalled();
+			expect(compare).toHaveBeenCalledWith(
+				"Password123",
+				"hashed-password"
+			);
+
+			expect(sign).not.toHaveBeenCalled();
+			expect(redisClient.setEx).not.toHaveBeenCalled();
 			expect(auditLogMock.create).not.toHaveBeenCalled();
 		});
   	});
@@ -424,7 +474,7 @@ describe("SignInService", () => {
 
 		});
 
-		it("should throw if ACL provider fails", async () => {
+		it("should throw if STORE_USER ACL provider fails", async () => {
 			const mockStoreUser = {
 				id: 2,
 				name: "Alice",
@@ -465,7 +515,7 @@ describe("SignInService", () => {
 			expect(auditLogMock.create).not.toHaveBeenCalled();
 		});
 
-		it("should throw if JWT_SECRET is missing", async () => {
+		it("should throw if STORE_USER JWT_SECRET is missing", async () => {
 			const mockStoreUser = {
 				id: 2,
 				name: "Alice",
